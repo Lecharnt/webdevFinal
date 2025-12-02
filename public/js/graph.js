@@ -108,24 +108,18 @@ function drawDailyOutputChart() {
             }
 
             const rows = raw.map(item => [String(item[0]), Number(item[1])]);
-
             const data = google.visualization.arrayToDataTable([
                 ["Label", params.y.toUpperCase()],
                 ...rows
             ]);
-
             const chart = new google.visualization.AreaChart(
                 document.getElementById("DailyEnergyOutput")
             );
-
             chart.draw(data, {
                 height: 400,
                 title: `${params.y.toUpperCase()} Output (${params.range})`,
                 legend: "none",
-                hAxis: {
-                    slantedText: true,
-                    showTextEvery: 1
-                }
+                hAxis: { slantedText: true, showTextEvery: 1 }
             });
         })
         .catch(err => console.error("Daily Energy Output Chart Error:", err));
