@@ -1,30 +1,70 @@
 const express = require("express");
+const bodyParser = require("body-parser");
 const path = require("path");
+const { MongoClient, ObjectId } = require("mongodb");
 
 const app = express();
-const PORT = 3001;//the used port
 
-//home page
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json());
+app.use(express.static(__dirname));
+
+const url = "mongodb://localhost:27017";
+const dbName = "FinalProject";
+const collectionName = "data";
+
+app.listen(3000, () => {
+    console.log("Server started on port 3000");
+});
+
+app.get("/get-all-data", async (req, res) => {
+    const client = await MongoClient.connect(url);
+    const db = client.db(dbName);
+    const items = await db.collection(collectionName).find({}).toArray();
+    res.json(items);
+    client.close();
+});
+
+app.get("/get-data-by-day", async (req, res) => {
+    const date = req.query.date;
+    const client = await MongoClient.connect(url);
+    const db = client.db(dbName);
+
+    const start = new Date(date + "T00:00:00Z");
+    const end = new Date(date + "T23:59:59Z");
+
+    const items = await db.collection(collectionName).find({
+        rowTimestamp: { $gte: start, $lte: end }
+    }).toArray();
+
+    res.json(items);
+    client.close();
+});
+
+app.get("/get-data-by-id", async (req, res) => {
+    const id = req.query.id;
+    const client = await MongoClient.connect(url);
+    const db = client.db(dbName);
+    const item = await db.collection(collectionName).findOne({ _id: new ObjectId(id) });
+    res.json(item);
+    client.close();
+});
+
 app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, "pages", "MainPage.html"));
 });
 app.get("/statistics", (req, res) => {
     res.sendFile(path.join(__dirname, "pages", "EnergyStatistics.html"));
 });
-
 app.get("/contact", (req, res) => {
     res.sendFile(path.join(__dirname, "pages", "ContactInformation.html"));
 });
-
-
 app.get("/solar-statistics", (req, res) => {
     res.sendFile(path.join(__dirname, "pages", "SolarStatistics.html"));
 });
 app.get("/wind-statistics", (req, res) => {
     res.sendFile(path.join(__dirname, "pages", "WindStatistics.html"));
 });
-
-
 app.get("/graph-battery-voltage", (req, res) => {
     res.sendFile(path.join(__dirname, "pages", "GraphBatteryVoltage.html"));
 });
@@ -36,71 +76,109 @@ app.get("/graph-power-sources", (req, res) => {
 });
 
 app.get("/api/test-data", (req, res) => {
-    const testData = {
-        current: 120,
-        volts: 55
-    };
-
+    const testData = { current: 120, volts: 55 };
     res.json(testData);
 });
-app.get("/api/daily-output", (req, res) => {
-    const range = req.query.range;  // day / month / year
-    const date = req.query.date;    // YYYY-MM-DD, YYYY-MM, YYYY
-    const y = req.query.y;          // solar / wind
 
+app.get("/api/daily-output", async function (req, res) {
+    const { range, y, date } = req.query;
     if (!date) return res.status(400).json({ error: "Missing date" });
 
-    const parts = date.split("-");
-    const year  = Number(parts[0]);
-    const month = parts[1] ? Number(parts[1]) : null;
-    const day   = parts[2] ? Number(parts[2]) : null;
+    const client = await MongoClient.connect(url);
+    const db = client.db(dbName);
 
-    console.log("Parsed:", { range, year, month, day, y });
+    try {
+        let start, end;
 
-    // --- Day: 24 hours ---
-    if (range === "day") {
-        const labels = Array.from({ length: 24 }, (_, i) => `${i + 1}:00`);
-        let data;
-        if (y === "solar") {
-            // simulate sunrise/sunset pattern
-            data = labels.map((_, i) => {
-                if (i < 6 || i > 18) return 0;       // night
-                return Math.floor(Math.random() * 500 + 100); // day power
+        if (range === "day") {
+            const [Y, M, D] = date.split("-").map(Number);
+            start = new Date(Date.UTC(Y, M - 1, D, 0, 0, 0));
+            end   = new Date(Date.UTC(Y, M - 1, D, 23, 59, 59));
+
+            const items = await db.collection(collectionName).find({
+                rowTimestamp: { $gte: start, $lte: end }
+            }).toArray();
+
+            let data = Array(24).fill(0);
+
+            items.forEach(doc => {
+                const ts = new Date(doc.rowTimestamp);
+                const hour = ts.getUTCHours();
+
+                const value =
+                    y === "solar"
+                        ? Math.abs(parseFloat(doc.PVpow ?? 0))
+                        : Math.abs(parseFloat(doc.acPower ?? 0));
+
+                data[hour] += value / 1000;
             });
-        } else if (y === "wind") {
-            data = labels.map(() => Math.floor(Math.random() * 400 + 50));
-        }
-        const result = labels.map((label, i) => [label, data[i]]);
-        return res.json(result);
-    }
 
-    // --- Month: 31 days ---
-    if (range === "month") {
-        const days = Array.from({ length: 31 }, (_, i) => i + 1);
-        let data;
-        if (y === "solar") {
-            data = days.map(() => Math.floor(Math.random() * 800 + 200));
-        } else if (y === "wind") {
-            data = days.map(() => Math.floor(Math.random() * 600 + 100));
+            return res.json(data.map((v, i) => [`${i}:00`, v]));
         }
-        const result = days.map((d, i) => [d, data[i]]);
-        return res.json(result);
-    }
 
-    // --- Year: 12 months ---
-    if (range === "year") {
-        const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-        let data;
-        if (y === "solar") {
-            data = months.map(() => Math.floor(Math.random() * 12000 + 3000));
-        } else if (y === "wind") {
-            data = months.map(() => Math.floor(Math.random() * 10000 + 2000));
+        if (range === "month") {
+            const [Y, M] = date.split("-").map(Number);
+            start = new Date(Date.UTC(Y, M - 1, 1));
+            end   = new Date(Date.UTC(Y, M, 0, 23, 59, 59));
+
+            const items = await db.collection(collectionName).find({
+                rowTimestamp: { $gte: start, $lte: end }
+            }).toArray();
+
+            const days = new Date(Y, M, 0).getDate();
+            let data = Array(days).fill(0);
+
+            items.forEach(doc => {
+                const ts = new Date(doc.rowTimestamp);
+                const d = ts.getUTCDate() - 1;
+
+                const value =
+                    y === "solar"
+                        ? Math.abs(parseFloat(doc.PVpow ?? 0))
+                        : Math.abs(parseFloat(doc.acPower ?? 0));
+
+                data[d] += value / 1000;
+            });
+
+            return res.json(data.map((v, i) => [i + 1, v]));
         }
-        const result = months.map((m, i) => [m, data[i]]);
-        return res.json(result);
-    }
 
-    res.status(400).json({ error: "Invalid range" });
+        if (range === "year") {
+            const Y = Number(date);
+            start = new Date(Date.UTC(Y, 0, 1));
+            end   = new Date(Date.UTC(Y, 11, 31, 23, 59, 59));
+
+            const items = await db.collection(collectionName).find({
+                rowTimestamp: { $gte: start, $lte: end }
+            }).toArray();
+
+            let data = Array(12).fill(0);
+
+            items.forEach(doc => {
+                const ts = new Date(doc.rowTimestamp);
+                const m = ts.getUTCMonth();
+
+                const value =
+                    y === "solar"
+                        ? Math.abs(parseFloat(doc.PVpow ?? 0))
+                        : Math.abs(parseFloat(doc.acPower ?? 0));
+
+                data[m] += value / 1000;
+            });
+
+            return res.json(
+                data.map((v, i) => [
+                    ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][i],
+                    v
+                ])
+            );
+        }
+
+        res.status(400).json({ error: "Invalid range" });
+
+    } finally {
+        client.close();
+    }
 });
 app.get("/api/daily-output-cool", (req, res) => {
     const range = req.query.range;  // day / month / year
@@ -163,152 +241,78 @@ app.get("/api/daily-output-cool", (req, res) => {
 });
 
 
+
 app.get("/api/performance-data", (req, res) => {
     const testData = [
-        {
-            label: "REBus",
-            current: 60
-        },
-        {
-            label: "REBus Current",
-            current: 75
-        },
-        {
-            label: "REBus Power",
-            current: 75
-        },
-        {
-            label: "Out Volt",
-            current: 220
-        },
-        {
-            label: "Out Current",
-            current: 15
-        },
-        {
-            label: "Out Power",
-            current: 300
-        },
-        {
-            label: "Out Volt 2",
-            current: 215
-        },
-        {
-            label: "Out Current 2",
-            current: 215
-        },
-        {
-            label: "Out Power 2",
-            current: 280
-        },
-        {
-            label: "Remote Current",
-            current: 10
-        },
-        {
-            label: "Remote Volt",
-            current: 10
-        },
-        {
-            label: "Remote Power",
-            current: 120
-        }
+        { label: "REBus", current: 60 },
+        { label: "REBus Current", current: 75 },
+        { label: "REBus Power", current: 75 },
+        { label: "Out Volt", current: 220 },
+        { label: "Out Current", current: 15 },
+        { label: "Out Power", current: 300 },
+        { label: "Out Volt 2", current: 215 },
+        { label: "Out Current 2", current: 215 },
+        { label: "Out Power 2", current: 280 },
+        { label: "Remote Current", current: 10 },
+        { label: "Remote Volt", current: 10 },
+        { label: "Remote Power", current: 120 }
     ];
-
     res.json(testData);
 });
+
 app.get("/api/power-sources", (req, res) => {
-    const range = req.query.range;  // "day" | "month" | "year"
-    const date = req.query.date;    // "YYYY-MM-DD"
+    const range = req.query.range;
+    const date = req.query.date;
+    if (!date) return res.status(400).json({ error: "Missing date" });
 
-    if (!date) {
-        return res.status(400).json({ error: "Missing date" });
-    }
-
-    // ✅ Parse as plain string, no timezone issues
     const [yearStr, monthStr, dayStr] = date.split("-");
     const year = Number(yearStr);
-    const month = Number(monthStr); // 1–12
+    const month = Number(monthStr);
     const day = Number(dayStr);
 
-    console.log("Parsed date:", { range, year, month, day });
-
-    // === TEST DATA for DEMO ===
-    if (range === "day") {
-        if (month === 12 && day === 1) {
-            return res.json({
-                labels: [
-                    "1AM","2AM","3AM","4AM","5AM","6AM",
-                    "7AM","8AM","9AM","10AM","11AM","12PM"
-                ],
-                grid:    [500,550,600,650,700,750,800,1200,1500,1700,1400,1000],
-                solar:   [0,0,0,10,50,150,300,800,1200,1600,1800,1500],
-                battery: [200,180,150,120,100,90,85,80,120,200,400,600]
-            });
-        }
-
-        return res.json({ error: "No data available for that day." });
+    if (range === "day" && month === 12 && day === 1) {
+        return res.json({
+            labels: ["1AM","2AM","3AM","4AM","5AM","6AM","7AM","8AM","9AM","10AM","11AM","12PM"],
+            grid:    [500,550,600,650,700,750,800,1200,1500,1700,1400,1000],
+            solar:   [0,0,0,10,50,150,300,800,1200,1600,1800,1500],
+            battery: [200,180,150,120,100,90,85,80,120,200,400,600]
+        });
     }
 
-    if (range === "month") {
-        if (month === 12) {
-            return res.json({
-                labels: [1,2,3,4,5,6,7,8,9,10,11,12],
-                grid:    [800,750,900,950,1000,1100,1200,1300,1400,1500,1200,1200],
-                solar:   [200,400,500,600,700,800,900,1000,1100,1200,1200,1200],
-                battery: [100,120,90,80,150,200,250,300,350,400,1200,1200]
-            });
-        }
-
-        return res.json({ error: "No data for that month." });
+    if (range === "month" && month === 12) {
+        return res.json({
+            labels: [1,2,3,4,5,6,7,8,9,10,11,12],
+            grid:    [800,750,900,950,1000,1100,1200,1300,1400,1500,1200,1200],
+            solar:   [200,400,500,600,700,800,900,1000,1100,1200,1200,1200],
+            battery: [100,120,90,80,150,200,250,300,350,400,1200,1200]
+        });
     }
 
-    if (range === "year") {
-        if (year === 2025) {
-            return res.json({
-                labels: ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],
-                grid:    [15000,14000,16000,17000,18000,19000,17500,16500,16000,15000,14500,14800],
-                solar:   [3000,4000,6000,8000,12000,15000,16000,17000,13000,9000,5000,3000],
-                battery: [2000,2500,2300,2200,2100,2600,2700,3000,3200,2800,2600,2300]
-            });
-        }
-
-        return res.json({ error: "No data for that year." });
+    if (range === "year" && year === 2025) {
+        return res.json({
+            labels: ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],
+            grid:    [15000,14000,16000,17000,18000,19000,17500,16500,16000,15000,14500,14800],
+            solar:   [3000,4000,6000,8000,12000,15000,16000,17000,13000,9000,5000,3000],
+            battery: [2000,2500,2300,2200,2100,2600,2700,3000,3200,2800,2600,2300]
+        });
     }
 
-    res.status(400).json({ error: "Invalid range" });
+    res.json({ error: "No data available" });
 });
-
-
-
-
 
 app.get("/api/battery", (req, res) => {
-    // Test data — you can update these later with real values
-    const batteryData = {
-        percent: 72,
-        volts: 12.6,
-        current: 4.2
-    };
-
-    res.json(batteryData);
+    res.json({ percent: 72, volts: 12.6, current: 4.2 });
 });
+
 app.get("/api/power-stats", (req, res) => {
-    const data = {
-        solarPower: 850,          // 0–1500
-        outputPower: 430,         // 0–700
-        energyCost: 1200,         // used energy
-        energyEarned: 1650        // generated energy
-    };
-
-    res.json(data);
+    res.json({
+        solarPower: 850,
+        outputPower: 430,
+        energyCost: 1200,
+        energyEarned: 1650
+    });
 });
 
-//these are the static files that are being used
-app.use("/public", express.static(path.join(__dirname, "public")));//for the public files like pages images cs and js
-app.use("/components", express.static(path.join(__dirname, "components")));//for the footer and header and ather components
-app.use("/", express.static(path.join(__dirname, "pages")));//this is to manage all the pages for the site
-
-app.listen(PORT, () => {
-    console.log(`Server started at http://localhost:${PORT}`);
-});
+app.use("/public", express.static(path.join(__dirname, "public")));
+app.use("/components", express.static(path.join(__dirname, "components")));
+app.use("/", express.static(path.join(__dirname, "pages")));
