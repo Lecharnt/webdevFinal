@@ -1,0 +1,25 @@
+.nav-link.active {
+    position: relative;
+    font-weight: 600;
+}
+.nav-link.active::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 2px;
+    background-color: #000000;
+}
+.nav-link.active::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 2px;
+    background-color: #000000;
+}
+.navbar.bg-body-tertiary {
+    background-color: rgba(221, 221, 221, 0.91) !important;
+}
