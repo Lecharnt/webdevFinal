@@ -1,69 +1,131 @@
-google.charts.load("current", { packages: ["corechart"] });
-google.charts.setOnLoadCallback(initControls);
+google.charts.setOnLoadCallback(initPowerSources);
 
-function initControls() {
-    let dropdown = document.querySelector("[data-x-axis]");
-    let dateInput = document.getElementById("datePicker");
+function initPowerSources() {
+    console.log("Initializing Power Sources chart...");
+    setupPowerSourcesControls();
+    const dateInput = document.getElementById("power-sources-date");
+    if (dateInput) {
+        dateInput.value = getLocalDateForPowerSources();
+    }
+    loadPowerSourcesChart();
+}
 
-    // Handle dropdown selections
-    document.querySelectorAll(".dropdown-menu .dropdown-item").forEach(item => {
-        item.addEventListener("click", () => {
-            const range = item.dataset.value;
+function getLocalDateForPowerSources() {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().split("T")[0];
+}
+
+function setupPowerSourcesControls() {
+    console.log("Setting up controls for Power Sources...");
+    const chartElement = document.getElementById("PowerSourcesChart");
+    if (!chartElement) {
+        console.error("PowerSourcesChart chart element not found!");
+        return;
+    }
+
+    const cardBody = chartElement.closest('.card-body');
+    if (!cardBody) {
+        console.error("Could not find card body for Power Sources");
+        return;
+    }
+
+    // Get dropdown elements specific to Power Sources section
+    const dropdown = cardBody.querySelector("[data-x-axis]");
+    const dateInput = document.getElementById("power-sources-date");
+
+    if (!dropdown) {
+        console.error("Power Sources dropdown not found!");
+        return;
+    }
+
+    if (!dateInput) {
+        console.error("power-sources-date input not found!");
+        return;
+    }
+
+    // Handle dropdown selections for Power Sources
+    cardBody.querySelectorAll(".dropdown-menu .dropdown-item").forEach(item => {
+        item.addEventListener("click", (e) => {
+            e.preventDefault();
+            const range = e.target.dataset.value;
+
+            console.log("Power Sources range changed to:", range);
 
             // Update button text and internal dataset
-            dropdown.textContent = item.textContent;
+            dropdown.textContent = e.target.textContent;
             dropdown.dataset.range = range;
 
-            // ALWAYS reload chart after selecting dropdown item
-            tryLoadChart();
+            loadPowerSourcesChart();
         });
     });
 
-    // Also reload when date changes
-    dateInput.addEventListener("change", tryLoadChart);
-
-    function tryLoadChart() {
-        const range = dropdown.dataset.range;
-        const date = dateInput.value;
-
-        if (!range || !date) return;
-
-        loadChart(range, date);
-    }
+    // Reload when date changes
+    dateInput.addEventListener("change", loadPowerSourcesChart);
 }
 
+function getChartParamsForPowerSources() {
+    const chartElement = document.getElementById("PowerSourcesChart");
+    if (!chartElement) return { range: 'day', date: getLocalDateForPowerSources() };
 
-function loadChart(range, date) {
-    fetch(`/api/power-sources?range=${range}&date=${date}`)
+    const cardBody = chartElement.closest('.card-body');
+    if (!cardBody) return { range: 'day', date: getLocalDateForPowerSources() };
+
+    const dropdown = cardBody.querySelector("[data-x-axis]");
+    const dateInput = document.getElementById("power-sources-date");
+
+    return {
+        range: dropdown ? dropdown.dataset.range : 'day',
+        date: dateInput ? dateInput.value : getLocalDateForPowerSources()
+    };
+}
+
+function loadPowerSourcesChart() {
+    console.log("Loading Power Sources chart...");
+    const params = getChartParamsForPowerSources();
+
+    console.log("Power Sources params:", params);
+
+    if (!params.range || !params.date) {
+        console.log("Please select both range and date for Power Sources");
+        return;
+    }
+
+    fetch(`/api/power-sources?range=${params.range}&date=${params.date}`)
         .then(res => res.json())
         .then(raw => {
-            if (raw.error) return alert(raw.error);
-            drawChart(raw, range);
+            console.log("Received data for Power Sources:", raw);
+
+            if (raw.error) {
+                //console.error("API error for Power Sources:", raw.error);
+                return alert(raw.error);
+            }
+
+            if (!raw || !raw.labels || !raw.grid || !raw.solar || !raw.battery) {
+                console.error("Invalid data structure for Power Sources");
+                return;
+            }
+
+            drawPowerSourcesChart(raw, params.range);
         })
-        .catch(err => console.error("Chart load error:", err));
+        .catch(err => console.error("Power Sources Chart load error:", err));
 }
 
-function drawChart(raw, range) {
-    const rows = raw.labels.map((label, i) => [
-        String(label),
-        raw.grid[i],
-        raw.solar[i],
-        raw.battery[i]
-    ]);
+function drawPowerSourcesChart(raw, range) {
+    console.log("Drawing Power Sources chart...");
 
     const data = google.visualization.arrayToDataTable([
         ["Time", "Grid", "Solar", "Battery"],
         ...raw.labels.map((label, i) => [
-            String(label),           // <— string labels prevent numeric scaling
-            raw.grid[i],
-            raw.solar[i],
-            raw.battery[i]
+            String(label),
+            raw.grid[i] || 0,
+            raw.solar[i] || 0,
+            raw.battery[i] || 0
         ])
     ]);
 
-
     const options = {
-        title: chartTitle(range),
+        title: chartTitleForPowerSources(range),
         height: 450,
         vAxis: { minValue: 0, maxValue: 2000 },
         legend: { position: "bottom" },
@@ -76,10 +138,11 @@ function drawChart(raw, range) {
     ).draw(data, options);
 }
 
-function chartTitle(range) {
+function chartTitleForPowerSources(range) {
     switch (range) {
         case "day": return "Hourly Power Output";
         case "month": return "Daily Power Output (Month)";
         case "year": return "Monthly Power Output (Year)";
+        default: return "Power Sources";
     }
 }
