@@ -180,6 +180,65 @@ app.get("/api/daily-output", async function (req, res) {
         client.close();
     }
 });
+app.get("/api/daily-output-cool", (req, res) => {
+    const range = req.query.range;  // day / month / year
+    const date = req.query.date;    // YYYY-MM-DD, YYYY-MM, YYYY
+    const y = req.query.y;          // solar / wind
+
+    if (!date) return res.status(400).json({ error: "Missing date" });
+
+    const parts = date.split("-");
+    const year  = Number(parts[0]);
+    const month = parts[1] ? Number(parts[1]) : null;
+    const day   = parts[2] ? Number(parts[2]) : null;
+
+    console.log("Parsed:", { range, year, month, day, y });
+
+    // --- Day: 24 hours ---
+    if (range === "day") {
+        const labels = Array.from({ length: 24 }, (_, i) => `${i + 1}:00`);
+        let data;
+        if (y === "solar") {
+            // simulate sunrise/sunset pattern
+            data = labels.map((_, i) => {
+                if (i < 6 || i > 18) return 0;       // night
+                return Math.floor(Math.random() * 500 + 100); // day power
+            });
+        } else if (y === "wind") {
+            data = labels.map(() => Math.floor(Math.random() * 400 + 50));
+        }
+        const result = labels.map((label, i) => [label, data[i]]);
+        return res.json(result);
+    }
+
+    // --- Month: 31 days ---
+    if (range === "month") {
+        const days = Array.from({ length: 31 }, (_, i) => i + 1);
+        let data;
+        if (y === "solar") {
+            data = days.map(() => Math.floor(Math.random() * 800 + 200));
+        } else if (y === "wind") {
+            data = days.map(() => Math.floor(Math.random() * 600 + 100));
+        }
+        const result = days.map((d, i) => [d, data[i]]);
+        return res.json(result);
+    }
+
+    // --- Year: 12 months ---
+    if (range === "year") {
+        const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+        let data;
+        if (y === "solar") {
+            data = months.map(() => Math.floor(Math.random() * 12000 + 3000));
+        } else if (y === "wind") {
+            data = months.map(() => Math.floor(Math.random() * 10000 + 2000));
+        }
+        const result = months.map((m, i) => [m, data[i]]);
+        return res.json(result);
+    }
+
+    res.status(400).json({ error: "Invalid range" });
+});
 
 
 
