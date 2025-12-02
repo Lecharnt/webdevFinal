@@ -8,6 +8,8 @@
   },
   "private": true,
   "dependencies": {
-    "express": "^5.1.0"
+    "csv-parse": "^6.1.0",
+    "express": "^5.1.0",
+    "mongoose": "^9.0.0"
   }
 }

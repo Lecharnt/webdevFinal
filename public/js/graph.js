@@ -4,6 +4,7 @@ google.charts.setOnLoadCallback(initCharts);
 function initCharts() {
     setupDropdownListeners();
     initControls()
+    document.getElementById("daily-outputs").addEventListener("change", drawDailyOutput);
     drawDailyOutput();
 }
 
@@ -55,46 +56,43 @@ function reloadChart(chartName) {
 }
 
 function drawDailyOutput() {
-
     const range = document.querySelector("[data-x-axis][data-chart='daily-output']").dataset.value;
     const y = document.querySelector("[data-y-axis][data-chart='daily-output']").dataset.value;
 
-    let date = null;
+    let rawInput = document.getElementById("daily-outputs").value;
+    if (!rawInput) return;
 
-    if (range === "day") date = document.getElementById("daily-outputs").value;
-    if (range === "month") date = document.getElementById("daily-outputs").value;
-    if (range === "year") date = document.getElementById("daily-outputs").value;
-
-    if (!date) return;
+    let date;
+    if (range === "day") {
+        date = rawInput; // YYYY-MM-DD
+    } else if (range === "month") {
+        // Convert YYYY-MM-DD -> YYYY-MM
+        const [yStr, mStr] = rawInput.split("-");
+        date = `${yStr}-${mStr}`;
+    } else if (range === "year") {
+        // Convert YYYY-MM-DD -> YYYY
+        date = rawInput.split("-")[0];
+    }
 
     fetch(`/api/daily-output?range=${range}&date=${date}&y=${y}`)
         .then(res => res.json())
         .then(raw => {
-
-            // raw = [ [label, value], [label, value], ... ]
-
             const rows = raw.map(item => [String(item[0]), Number(item[1])]);
-
             const data = google.visualization.arrayToDataTable([
                 ["Label", y.toUpperCase()],
                 ...rows
             ]);
-
             const chart = new google.visualization.AreaChart(
                 document.getElementById("DailyEnergyOutput")
             );
-
             chart.draw(data, {
                 height: 400,
                 title: `${y.toUpperCase()} Output (${range})`,
                 legend: "none",
-                hAxis: {
-                    slantedText: true,
-                    showTextEvery: 1
-                }
+                hAxis: { slantedText: true, showTextEvery: 1 }
             });
         })
-
         .catch(err => console.error("Chart Error:", err));
 }
+
 
