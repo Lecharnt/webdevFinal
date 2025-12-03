@@ -81,130 +81,172 @@ app.get("/api/test-data", (req, res) => {
 });
 
 app.get("/api/daily-output", async function (req, res) {
-    const { range, y, date } = req.query;
-    if (!date) return res.status(400).json({ error: "Missing date" });
+    const range = req.query.range;
+    const date = req.query.date;
+    const y = req.query.y;
+
+    if (!date) {
+        res.status(400).json({ error: "Missing date" });
+        return;
+    }
 
     const client = await MongoClient.connect(url);
     const db = client.db(dbName);
 
     try {
-        let start, end;
-
         if (range === "day") {
-            const [Y, M, D] = date.split("-").map(Number);
-            start = new Date(Date.UTC(Y, M - 1, D, 0, 0, 0));
-            end   = new Date(Date.UTC(Y, M - 1, D, 23, 59, 59));
+            var parts = date.split("-");
+            var year = Number(parts[0]);
+            var month = Number(parts[1]) - 1;
+            var day = Number(parts[2]);
+
+            var start = new Date(year, month, day, 0, 0, 0);
+            var end   = new Date(year, month, day, 23, 59, 59);
 
             const items = await db.collection(collectionName).find({
                 rowTimestamp: { $gte: start, $lte: end }
             }).toArray();
 
-            let data = Array(24).fill(0);
+            var labels = [];
+            var sums = [];
+            var counts = [];
+            for (var i = 0; i < 24; i++) {
+                labels.push(i + ":00");
+                sums.push(0);
+                counts.push(0);
+            }
 
-            items.forEach(doc => {
-                const ts = new Date(doc.rowTimestamp);
-                const hour = ts.getUTCHours();
-
-                const value =
-                    y === "solar"
-                        ? Math.abs(parseFloat(doc.PVpow ?? 0))
-                        : Math.abs(parseFloat(doc.acPower ?? 0));
-
-                data[hour] += value / 1000;
+            items.forEach(function (doc) {
+                var hour = new Date(doc.rowTimestamp).getHours();
+                var val = 0;
+                if (y === "solar") {
+                    val = parseFloat(doc.PVpow || 0);
+                } else if (y === "wind") {
+                    val = parseFloat(doc.acPower || 0);
+                }
+                sums[hour] = sums[hour] + val;
+                counts[hour] = counts[hour] + 1;
             });
 
-            return res.json(data.map((v, i) => [`${i}:00`, v]));
+            var averages = [];
+            for (var i = 0; i < 24; i++) {
+                if (counts[i] > 0) {
+                    averages.push((sums[i]) / 1000);
+                } else {
+                    averages.push(0);
+                }
+            }
+
+            var result = [];
+            for (var i = 0; i < 24; i++) {
+                result.push([labels[i], averages[i]]);
+            }
+            return res.json(result);
         }
 
         if (range === "month") {
-            const [Y, M] = date.split("-").map(Number);
-            start = new Date(Date.UTC(Y, M - 1, 1));
-            end   = new Date(Date.UTC(Y, M, 0, 23, 59, 59));
+            var parts = date.split("-");
+            var yearStr = parts[0];
+            var monthStr = parts[1];
+            var start = new Date(Number(yearStr), Number(monthStr) - 1, 1, 0, 0, 0);
+            var end = new Date(Number(yearStr), Number(monthStr), 0, 23, 59, 59);
 
             const items = await db.collection(collectionName).find({
                 rowTimestamp: { $gte: start, $lte: end }
             }).toArray();
 
-            const days = new Date(Y, M, 0).getDate();
-            let data = Array(days).fill(0);
+            var daysInMonth = new Date(Number(yearStr), Number(monthStr), 0).getDate();
+            var labels = [];
+            var sums = [];
+            var counts = [];
+            for (var i = 1; i <= daysInMonth; i++) {
+                labels.push(i);
+                sums.push(0);
+                counts.push(0);
+            }
 
-            items.forEach(doc => {
-                const ts = new Date(doc.rowTimestamp);
-                const d = ts.getUTCDate() - 1;
-
-                const value =
-                    y === "solar"
-                        ? Math.abs(parseFloat(doc.PVpow ?? 0))
-                        : Math.abs(parseFloat(doc.acPower ?? 0));
-
-                data[d] += value / 1000;
+            items.forEach(function (doc) {
+                var day = new Date(doc.rowTimestamp).getDate();
+                var val = 0;
+                if (y === "solar") {
+                    val = parseFloat(doc.PVpow || 0);
+                } else if (y === "wind") {
+                    val = parseFloat(doc.acPower || 0);
+                }
+                sums[day - 1] = sums[day - 1] + val;
+                counts[day - 1] = counts[day - 1] + 1;
             });
 
-            return res.json(data.map((v, i) => [i + 1, v]));
+            var averages = [];
+            for (var i = 0; i < daysInMonth; i++) {
+                if (counts[i] > 0) {
+                    averages.push((sums[i]) / 1000);
+                } else {
+                    averages.push(0);
+                }
+            }
+
+            var result = [];
+            for (var i = 0; i < daysInMonth; i++) {
+                result.push([labels[i], averages[i]]);
+            }
+            return res.json(result);
         }
 
         if (range === "year") {
-            const Y = Number(date);
-            start = new Date(Date.UTC(Y, 0, 1));
-            end   = new Date(Date.UTC(Y, 11, 31, 23, 59, 59));
+            var year = Number(date);
+            var start = new Date(year, 0, 1, 0, 0, 0);
+            var end = new Date(year, 11, 31, 23, 59, 59);
 
             const items = await db.collection(collectionName).find({
                 rowTimestamp: { $gte: start, $lte: end }
             }).toArray();
 
-            let data = Array(12).fill(0);
+            var labels = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+            var sums = [];
+            var counts = [];
+            for (var i = 0; i < 12; i++) {
+                sums.push(0);
+                counts.push(0);
+            }
 
-            items.forEach(doc => {
-                const ts = new Date(doc.rowTimestamp);
-                const m = ts.getUTCMonth();
-
-                const value =
-                    y === "solar"
-                        ? Math.abs(parseFloat(doc.PVpow ?? 0))
-                        : Math.abs(parseFloat(doc.acPower ?? 0));
-
-                data[m] += value / 1000;
+            items.forEach(function (doc) {
+                var month = new Date(doc.rowTimestamp).getMonth();
+                var val = 0;
+                if (y === "solar") {
+                    val = parseFloat(doc.PVpow);
+                } else if (y === "wind") {
+                    val = parseFloat(doc.acPower);
+                }
+                console.log("Month:", month, "Raw:", doc.acPower, "Parsed:", val);
+                if (isNaN(val)) val = 0;
+                sums[month] += val;
+                counts[month] += 1;
             });
 
-            return res.json(
-                data.map((v, i) => [
-                    ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][i],
-                    v
-                ])
-            );
+
+            var averages = [];
+            for (var i = 0; i < 12; i++) {
+                if (counts[i] > 0) {
+                    averages.push(sums[i] / 1000);
+                } else {
+                    averages.push(0);
+                }
+            }
+
+            var result = [];
+            for (var i = 0; i < 12; i++) {
+                result.push([labels[i], averages[i]]);
+            }
+            return res.json(result);
         }
 
         res.status(400).json({ error: "Invalid range" });
-
     } finally {
         client.close();
     }
 });
-// Example Express.js route
-app.get('/api/energy-data', (req, res) => {
-    const energyData = {
-        ac_voltage: 230.5,    // in Volts
-        ac_current: 15.2,     // in Amps
-        ac_power: 3.5,        // in kW
-        timestamp: new Date().toISOString()
-    };
 
-    res.json(energyData);
-});
-const windData = {
-    pv_wh: "12,450",          // Total PV watt hours
-    used_wh: "8,765",         // Total watt hours used
-    wind_wh: "5,432",         // Total wind watt hours
-    vawt_v: "24.5",           // VAWT voltage
-    vawt_cur: "8.75",         // VAWT current
-    vawt_rms: "120.3",        // VAWT RMS
-    vawt_pow: "215",          // VAWT power
-    hawt_rms: "118.7",        // HAWT RMS
-    wind_bat_v: "13.8",       // Wind battery voltage
-    wind_cur: "12.45",        // Wind current
-    rpm: "1250",              // RPM
-    wind_pow: "456"           // Wind power
-};
 app.get('/api/wind-data', (req, res) => {
     console.log('Wind data requested');
 
@@ -221,66 +263,178 @@ app.get('/api/wind-data', (req, res) => {
 
     res.json(mockData);
 });
-app.get("/api/daily-output-cool", (req, res) => {
+
+app.get("/api/daily-output-cool", async function (req, res) {
     const range = req.query.range;  // day / month / year
     const date = req.query.date;    // YYYY-MM-DD, YYYY-MM, YYYY
-    const y = req.query.y;          // solar / wind
 
-    if (!date) return res.status(400).json({ error: "Missing date" });
-
-    const parts = date.split("-");
-    const year  = Number(parts[0]);
-    const month = parts[1] ? Number(parts[1]) : null;
-    const day   = parts[2] ? Number(parts[2]) : null;
-
-    console.log("Parsed:", { range, year, month, day, y });
-
-    // --- Day: 24 hours ---
-    if (range === "day") {
-        const labels = Array.from({ length: 24 }, (_, i) => `${i + 1}:00`);
-        let data;
-        if (y === "solar") {
-            // simulate sunrise/sunset pattern
-            data = labels.map((_, i) => {
-                if (i < 6 || i > 18) return 0;       // night
-                return Math.floor(Math.random() * 500 + 100); // day power
-            });
-        } else if (y === "wind") {
-            data = labels.map(() => Math.floor(Math.random() * 400 + 50));
-        }
-        const result = labels.map((label, i) => [label, data[i]]);
-        return res.json(result);
+    if (!date) {
+        res.status(400).json({ error: "Missing date" });
+        return;
     }
 
-    // --- Month: 31 days ---
-    if (range === "month") {
-        const days = Array.from({ length: 31 }, (_, i) => i + 1);
-        let data;
-        if (y === "solar") {
-            data = days.map(() => Math.floor(Math.random() * 800 + 200));
-        } else if (y === "wind") {
-            data = days.map(() => Math.floor(Math.random() * 600 + 100));
-        }
-        const result = days.map((d, i) => [d, data[i]]);
-        return res.json(result);
-    }
+    const client = await MongoClient.connect(url);
+    const db = client.db(dbName);
 
-    // --- Year: 12 months ---
-    if (range === "year") {
-        const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-        let data;
-        if (y === "solar") {
-            data = months.map(() => Math.floor(Math.random() * 12000 + 3000));
-        } else if (y === "wind") {
-            data = months.map(() => Math.floor(Math.random() * 10000 + 2000));
-        }
-        const result = months.map((m, i) => [m, data[i]]);
-        return res.json(result);
-    }
+    try {
+        if (range === "day") {
+            var parts = date.split("-");
+            var year = Number(parts[0]);
+            var month = Number(parts[1]) - 1;
+            var day = Number(parts[2]);
 
-    res.status(400).json({ error: "Invalid range" });
+            var start = new Date(year, month, day, 0, 0, 0);
+            var end   = new Date(year, month, day, 23, 59, 59);
+
+            var items = await db.collection(collectionName).find({
+                rowTimestamp: { $gte: start, $lte: end }
+            }).toArray();
+
+            var labels = [];
+            var sums = [];
+            var counts = [];
+            for (var i = 0; i < 24; i++) {
+                labels.push(i + ":00");
+                sums.push(0);
+                counts.push(0);
+            }
+
+            for (var j = 0; j < items.length; j++) {
+                var doc = items[j];
+                var hour = new Date(doc.rowTimestamp).getHours();
+                var val = parseFloat(doc.BattV);
+                if (isNaN(val)) {
+                    val = 0;
+                }
+                sums[hour] = sums[hour] + val;
+                counts[hour] = counts[hour] + 1;
+            }
+
+            var averages = [];
+            for (var i = 0; i < 24; i++) {
+                if (counts[i] > 0) {
+                    averages.push(sums[i] / counts[i]);
+                } else {
+                    averages.push(0);
+                }
+            }
+
+            var result = [];
+            for (var i = 0; i < 24; i++) {
+                result.push([labels[i], averages[i]]);
+            }
+            res.json(result);
+            return;
+        }
+
+        if (range === "month") {
+            var parts = date.split("-");
+            var year = Number(parts[0]);
+            var month = Number(parts[1]);
+
+            var start = new Date(year, month - 1, 1, 0, 0, 0);
+            var end   = new Date(year, month, 0, 23, 59, 59);
+
+            var items = await db.collection(collectionName).find({
+                rowTimestamp: { $gte: start, $lte: end }
+            }).toArray();
+
+            var daysInMonth = new Date(year, month, 0).getDate();
+            var labels = [];
+            var sums = [];
+            var counts = [];
+            for (var i = 1; i <= daysInMonth; i++) {
+                labels.push(i);
+                sums.push(0);
+                counts.push(0);
+            }
+
+            for (var j = 0; j < items.length; j++) {
+                var doc = items[j];
+                var day = new Date(doc.rowTimestamp).getDate();
+                var val = parseFloat(doc.BattV);
+                if (isNaN(val)) {
+                    val = 0;
+                }
+                sums[day - 1] = sums[day - 1] + val;
+                counts[day - 1] = counts[day - 1] + 1;
+            }
+
+            var averages = [];
+            for (var i = 0; i < daysInMonth; i++) {
+                if (counts[i] > 0) {
+                    averages.push(sums[i] / counts[i]);
+                } else {
+                    averages.push(0);
+                }
+            }
+
+            var result = [];
+            for (var i = 0; i < daysInMonth; i++) {
+                result.push([labels[i], averages[i]]);
+            }
+            res.json(result);
+            return;
+        }
+
+        if (range === "year") {
+            var year = Number(date);
+            var start = new Date(year, 0, 1, 0, 0, 0);
+            var end   = new Date(year, 11, 31, 23, 59, 59);
+
+            var items = await db.collection(collectionName).find({
+                rowTimestamp: { $gte: start, $lte: end }
+            }).toArray();
+
+            var labels = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+            var sums = [];
+            var counts = [];
+            for (var i = 0; i < 12; i++) {
+                sums.push(0);
+                counts.push(0);
+            }
+
+            for (var j = 0; j < items.length; j++) {
+                var doc = items[j];
+                var month = new Date(doc.rowTimestamp).getMonth();
+
+                var val = 0;
+                // Always sanitize BattV
+                if (doc.BattV !== undefined && doc.BattV !== null && doc.BattV !== "") {
+                    val = parseFloat(doc.BattV);
+                    if (isNaN(val)) {
+                        val = 0;
+                    }
+                }
+
+                sums[month] = sums[month] + val;
+                counts[month] = counts[month] + 1;
+            }
+
+            var averages = [];
+            for (var i = 0; i < 12; i++) {
+                if (counts[i] > 0) {
+                    averages.push(sums[i] / counts[i]);  // average BattV per month
+                } else {
+                    averages.push(0);
+                }
+            }
+
+            var result = [];
+            for (var i = 0; i < 12; i++) {
+                result.push([labels[i], averages[i]]);
+            }
+            res.json(result);
+            return;
+        }
+
+
+
+        res.status(400).json({ error: "Invalid range" });
+    } finally {
+        client.close();
+    }
 });
-
 
 
 app.get("/api/performance-data", (req, res) => {
@@ -301,45 +455,253 @@ app.get("/api/performance-data", (req, res) => {
     res.json(testData);
 });
 
-app.get("/api/power-sources", (req, res) => {
-    const range = req.query.range;
-    const date = req.query.date;
-    if (!date) return res.status(400).json({ error: "Missing date" });
+app.get("/api/power-sources", async function (req, res) {
+    const range = req.query.range;  // day / month / year
+    const date = req.query.date;    // YYYY-MM-DD, YYYY-MM, YYYY
 
-    const [yearStr, monthStr, dayStr] = date.split("-");
-    const year = Number(yearStr);
-    const month = Number(monthStr);
-    const day = Number(dayStr);
-
-    if (range === "day" && month === 12 && day === 1) {
-        return res.json({
-            labels: ["1AM","2AM","3AM","4AM","5AM","6AM","7AM","8AM","9AM","10AM","11AM","12PM"],
-            grid:    [500,550,600,650,700,750,800,1200,1500,1700,1400,1000],
-            solar:   [0,0,0,10,50,150,300,800,1200,1600,1800,1500],
-            battery: [200,180,150,120,100,90,85,80,120,200,400,600]
-        });
+    if (!date) {
+        res.status(400).json({ error: "Missing date" });
+        return;
     }
 
-    if (range === "month" && month === 12) {
-        return res.json({
-            labels: [1,2,3,4,5,6,7,8,9,10,11,12],
-            grid:    [800,750,900,950,1000,1100,1200,1300,1400,1500,1200,1200],
-            solar:   [200,400,500,600,700,800,900,1000,1100,1200,1200,1200],
-            battery: [100,120,90,80,150,200,250,300,350,400,1200,1200]
-        });
-    }
+    const client = await MongoClient.connect(url);
+    const db = client.db(dbName);
 
-    if (range === "year" && year === 2025) {
-        return res.json({
-            labels: ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],
-            grid:    [15000,14000,16000,17000,18000,19000,17500,16500,16000,15000,14500,14800],
-            solar:   [3000,4000,6000,8000,12000,15000,16000,17000,13000,9000,5000,3000],
-            battery: [2000,2500,2300,2200,2100,2600,2700,3000,3200,2800,2600,2300]
-        });
-    }
+    try {
+        if (range === "day") {
+            var parts = date.split("-");
+            var year = Number(parts[0]);
+            var month = Number(parts[1]) - 1;
+            var day = Number(parts[2]);
 
-    res.json({ error: "No data available" });
+            var start = new Date(year, month, day, 0, 0, 0);
+            var end   = new Date(year, month, day, 23, 59, 59);
+
+            const items = await db.collection(collectionName).find({
+                rowTimestamp: { $gte: start, $lte: end }
+            }).toArray();
+
+            var labels = [];
+            var grid = [];
+            var solar = [];
+            var battery = [];
+            var sumsGrid = [];
+            var sumsSolar = [];
+            var sumsBatt = [];
+            var counts = [];
+
+            for (var i = 0; i < 24; i++) {
+                labels.push(i + ":00");
+                sumsGrid.push(0);
+                sumsSolar.push(0);
+                sumsBatt.push(0);
+                counts.push(0);
+            }
+
+            for (var j = 0; j < items.length; j++) {
+                var doc = items[j];
+                var hour = new Date(doc.rowTimestamp).getHours();
+
+                var g = parseFloat(doc.GridPow || 0);
+                var s = parseFloat(doc.PVpow || 0);
+                var b = parseFloat(doc.BattPow || 0);
+
+                if (isNaN(g)) g = 0;
+                if (isNaN(s)) s = 0;
+                if (isNaN(b)) b = 0;
+
+                sumsGrid[hour] += g;
+                sumsSolar[hour] += s;
+                sumsBatt[hour] += b;
+                counts[hour] += 1;
+            }
+
+            for (var i = 0; i < 24; i++) {
+                if (counts[i] > 0) {
+                    grid.push(sumsGrid[i] / counts[i]);
+                    solar.push(sumsSolar[i] / counts[i]);
+                    battery.push(sumsBatt[i] / counts[i]);
+                } else {
+                    grid.push(0);
+                    solar.push(0);
+                    battery.push(0);
+                }
+            }
+
+            return res.json({ labels, grid, solar, battery });
+        }
+
+        if (range === "month") {
+            var parts = date.split("-");
+            var year = Number(parts[0]);
+            var month = Number(parts[1]);
+
+            var start = new Date(year, month - 1, 1, 0, 0, 0);
+            var end   = new Date(year, month, 0, 23, 59, 59);
+
+            const items = await db.collection(collectionName).find({
+                rowTimestamp: { $gte: start, $lte: end }
+            }).toArray();
+
+            var daysInMonth = new Date(year, month, 0).getDate();
+            var labels = [];
+            var grid = [];
+            var solar = [];
+            var battery = [];
+            var sumsGrid = [];
+            var sumsSolar = [];
+            var sumsBatt = [];
+            var counts = [];
+
+            for (var i = 1; i <= daysInMonth; i++) {
+                labels.push(i);
+                sumsGrid.push(0);
+                sumsSolar.push(0);
+                sumsBatt.push(0);
+                counts.push(0);
+            }
+
+            for (var j = 0; j < items.length; j++) {
+                var doc = items[j];
+                var day = new Date(doc.rowTimestamp).getDate();
+
+                var g = parseFloat(doc.GridPow || 0);
+                var s = parseFloat(doc.PVpow || 0);
+                var b = parseFloat(doc.BattPow || 0);
+
+                if (isNaN(g)) g = 0;
+                if (isNaN(s)) s = 0;
+                if (isNaN(b)) b = 0;
+
+                sumsGrid[day - 1] += g;
+                sumsSolar[day - 1] += s;
+                sumsBatt[day - 1] += b;
+                counts[day - 1] += 1;
+            }
+
+            for (var i = 0; i < daysInMonth; i++) {
+                if (counts[i] > 0) {
+                    grid.push(sumsGrid[i] / counts[i]);
+                    solar.push(sumsSolar[i] / counts[i]);
+                    battery.push(sumsBatt[i] / counts[i]);
+                } else {
+                    grid.push(0);
+                    solar.push(0);
+                    battery.push(0);
+                }
+            }
+
+            return res.json({ labels, grid, solar, battery });
+        }
+
+        if (range === "year") {
+            var yearStr = date.split("-")[0]; // handles YYYY or YYYY-MM-DD
+            var year = Number(yearStr);
+
+            var start = new Date(year, 0, 1, 0, 0, 0);
+            var end   = new Date(year, 11, 31, 23, 59, 59);
+
+            const items = await db.collection(collectionName).find({
+                rowTimestamp: { $gte: start, $lte: end }
+            }).toArray();
+
+            var labels = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+            var grid = [];
+            var solar = [];
+            var battery = [];
+            var sumsGrid = [];
+            var sumsSolar = [];
+            var sumsBatt = [];
+            var counts = [];
+
+            for (var i = 0; i < 12; i++) {
+                sumsGrid.push(0);
+                sumsSolar.push(0);
+                sumsBatt.push(0);
+                counts.push(0);
+            }
+
+            for (var j = 0; j < items.length; j++) {
+                var doc = items[j];
+                var month = new Date(doc.rowTimestamp).getMonth();
+
+                var g = parseFloat(doc.GridPow || 0);
+                var s = parseFloat(doc.PVpow || 0);
+                var b = parseFloat(doc.BattPow || 0);
+
+                if (isNaN(g)) g = 0;
+                if (isNaN(s)) s = 0;
+                if (isNaN(b)) b = 0;
+
+                sumsGrid[month] += g;
+                sumsSolar[month] += s;
+                sumsBatt[month] += b;
+                counts[month] += 1;
+            }
+
+            for (var i = 0; i < 12; i++) {
+                if (counts[i] > 0) {
+                    grid.push(sumsGrid[i] / counts[i]);
+                    solar.push(sumsSolar[i] / counts[i]);
+                    battery.push(sumsBatt[i] / counts[i]);
+                } else {
+                    grid.push(0);
+                    solar.push(0);
+                    battery.push(0);
+                }
+            }
+
+            return res.json({ labels, grid, solar, battery });
+        }
+
+        res.status(400).json({ error: "Invalid range" });
+    } finally {
+        client.close();
+    }
 });
+
+app.get("/api/daily-output-details", async (req, res) => {
+    const { date, hour, y } = req.query;
+    if (!date || hour == null) {
+        return res.status(400).json({ error: "Missing date or hour" });
+    }
+
+    const client = await MongoClient.connect(url);
+    const db = client.db(dbName);
+
+    try {
+        const parts = date.split("-");
+        const year = Number(parts[0]);
+        const month = Number(parts[1]) - 1;
+        const day = Number(parts[2]);
+
+        const start = new Date(year, month, day, Number(hour), 0, 0);
+        const end   = new Date(year, month, day, Number(hour), 59, 59);
+
+        const items = await db.collection(collectionName).find({
+            rowTimestamp: { $gte: start, $lte: end }
+        }).toArray();
+
+        // sanitize values
+        const results = items.map(doc => {
+            let val = 0;
+            if (y === "solar") {
+                val = parseFloat(doc.PVpow || 0);
+            } else if (y === "wind") {
+                val = parseFloat(doc.acPower || 0);
+            } else if (y === "battery") {
+                val = parseFloat(doc.BattPow || 0);
+            }
+            if (isNaN(val)) val = 0;
+            return { timestamp: doc.rowTimestamp, value: val };
+        });
+
+        res.json(results);
+    } finally {
+        client.close();
+    }
+});
+
 
 app.get("/api/battery", (req, res) => {
     res.json({ percent: 72, volts: 12.6, current: 4.2 });

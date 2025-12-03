@@ -55,24 +55,6 @@
                     <div>
                         <input type="date" id="daily-output-date" class="form-control" />
                     </div>
-                    <div class="dropdown">
-                        <button class="btn btn-secondary dropdown-toggle"
-                                data-x-axis
-                                data-chart="daily-outputs"
-                                data-value="day"
-                                type="button"
-                                id ="poolDay"
-                                data-bs-toggle="dropdown">
-
-                            Day
-                        </button>
-
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" data-value="day">Day</a></li>
-                            <li><a class="dropdown-item" data-value="month">Month</a></li>
-                            <li><a class="dropdown-item" data-value="year">Year</a></li>
-                        </ul>
-                    </div>
 
                     <div class="dropdown">
                         <button class="btn btn-secondary dropdown-toggle" id = "poolPow" type="button" data-bs-toggle="dropdown" aria-expanded="false" data-y-axis data-chart="daily-output" data-value="solar">
@@ -85,7 +67,8 @@
                     </div>
                 </div>
             </div>
-            <h2>Data from selected day:</h2>
+            <h2 class="text-center">Data from selected day:</h2>
+            <div id="daily-output-details"></div>
         </div>
     </div>
 </div>
