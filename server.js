@@ -180,6 +180,47 @@ app.get("/api/daily-output", async function (req, res) {
         client.close();
     }
 });
+// Example Express.js route
+app.get('/api/energy-data', (req, res) => {
+    const energyData = {
+        ac_voltage: 230.5,    // in Volts
+        ac_current: 15.2,     // in Amps
+        ac_power: 3.5,        // in kW
+        timestamp: new Date().toISOString()
+    };
+
+    res.json(energyData);
+});
+const windData = {
+    pv_wh: "12,450",          // Total PV watt hours
+    used_wh: "8,765",         // Total watt hours used
+    wind_wh: "5,432",         // Total wind watt hours
+    vawt_v: "24.5",           // VAWT voltage
+    vawt_cur: "8.75",         // VAWT current
+    vawt_rms: "120.3",        // VAWT RMS
+    vawt_pow: "215",          // VAWT power
+    hawt_rms: "118.7",        // HAWT RMS
+    wind_bat_v: "13.8",       // Wind battery voltage
+    wind_cur: "12.45",        // Wind current
+    rpm: "1250",              // RPM
+    wind_pow: "456"           // Wind power
+};
+app.get('/api/wind-data', (req, res) => {
+    console.log('Wind data requested');
+
+    // Add random variation for demo (remove in production)
+    const mockData = {
+        ...windData,
+        vawt_v: (24 + Math.random() * 2).toFixed(1),
+        vawt_cur: (8 + Math.random() * 2).toFixed(2),
+        vawt_pow: (200 + Math.random() * 50).toFixed(0),
+        wind_pow: (400 + Math.random() * 100).toFixed(0),
+        rpm: (1200 + Math.random() * 200).toFixed(0),
+        timestamp: new Date().toISOString()
+    };
+
+    res.json(mockData);
+});
 app.get("/api/daily-output-cool", (req, res) => {
     const range = req.query.range;  // day / month / year
     const date = req.query.date;    // YYYY-MM-DD, YYYY-MM, YYYY
