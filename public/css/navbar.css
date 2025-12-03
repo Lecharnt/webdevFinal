@@ -9,7 +9,7 @@
     right: 0;
     top: 0;
     height: 2px;
-    background-color: #000000;
+    background-color: var(--color-primary-dark);
 }
 .nav-link.active::after {
     content: "";
@@ -18,7 +18,7 @@
     right: 0;
     bottom: 0;
     height: 2px;
-    background-color: #000000;
+    background-color: var(--color-primary-dark);
 }
 .navbar.bg-body-tertiary {
     background-color: rgba(221, 221, 221, 0.91) !important;

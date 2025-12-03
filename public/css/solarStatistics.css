@@ -3,4 +3,6 @@ body,
 #myChart {
     height: 100%;
     width: 100%;
+    font-family: inherit; /* Inherits from :root */
+    color: var(--color-primary);
 }
