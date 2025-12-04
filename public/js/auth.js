@@ -51,7 +51,7 @@ async function login() {
 
         if (result.success) {
             // Login successful - stay on same page or redirect
-            window.location.href = '/'; // Go to main page
+            window.location.href = '/statistics'; // Go to main page
         }
     } catch (error) {
         console.error('Login error:', error);

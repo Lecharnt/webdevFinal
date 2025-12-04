@@ -9,7 +9,7 @@
     right: 0;
     top: 0;
     height: 2px;
-    background-color: var(--color-primary-dark);
+    background-color: #000000;
 }
 .nav-link.active::after {
     content: "";
@@ -18,7 +18,7 @@
     right: 0;
     bottom: 0;
     height: 2px;
-    background-color: var(--color-primary-dark);
+    background-color: #000000;
 }
 .navbar.bg-body-tertiary {
     background-color: rgba(221, 221, 221, 0.91) !important;
@@ -35,7 +35,7 @@
 body {
     opacity: 1;
     animation-name: fadeInOpacity;
-    animation-duration: .5s;
-    animation-iteration-count: 1;
+    animation-duration: .5s; /* How long the animation takes */
+    animation-iteration-count: 1; /* Runs once */
     animation-timing-function: ease-in;
 }
