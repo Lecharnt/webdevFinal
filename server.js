@@ -1,8 +1,53 @@
 const express = require("express");
 const path = require("path");
+const { MongoClient, ObjectId } = require("mongodb");
 
 const app = express();
-const PORT = 3001;//the used port
+
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json());
+app.use(express.static(__dirname));
+
+const url = "mongodb://localhost:27017";
+const dbName = "FinalProject";
+const collectionName = "data";
+
+app.listen(3000, () => {
+    console.log("Server started on port 3000");
+});
+
+app.get("/get-all-data", async (req, res) => {
+    const client = await MongoClient.connect(url);
+    const db = client.db(dbName);
+    const items = await db.collection(collectionName).find({}).toArray();
+    res.json(items);
+    client.close();
+});
+
+app.get("/get-data-by-day", async (req, res) => {
+    const date = req.query.date;
+    const client = await MongoClient.connect(url);
+    const db = client.db(dbName);
+
+    const start = new Date(date + "T00:00:00Z");
+    const end = new Date(date + "T23:59:59Z");
+
+    const items = await db.collection(collectionName).find({
+        rowTimestamp: { $gte: start, $lte: end }
+    }).toArray();
+
+    res.json(items);
+    client.close();
+});
+
+app.get("/get-data-by-id", async (req, res) => {
+    const id = req.query.id;
+    const client = await MongoClient.connect(url);
+    const db = client.db(dbName);
+    const item = await db.collection(collectionName).findOne({ _id: new ObjectId(id) });
+    res.json(item);
+    client.close();
+});
 
 //home page
 app.get("/", (req, res) => {
@@ -235,21 +280,14 @@ app.get("/api/battery", (req, res) => {
     res.json(batteryData);
 });
 app.get("/api/power-stats", (req, res) => {
-    const data = {
-        solarPower: 850,          // 0–1500
-        outputPower: 430,         // 0–700
-        energyCost: 1200,         // used energy
-        energyEarned: 1650        // generated energy
-    };
-
-    res.json(data);
+    res.json({
+        solarPower: 850,
+        outputPower: 430,
+        energyCost: 1200,
+        energyEarned: 1650
+    });
 });
 
-//these are the static files that are being used
-app.use("/public", express.static(path.join(__dirname, "public")));//for the public files like pages images cs and js
-app.use("/components", express.static(path.join(__dirname, "components")));//for the footer and header and ather components
-app.use("/", express.static(path.join(__dirname, "pages")));//this is to manage all the pages for the site
-
-app.listen(PORT, () => {
-    console.log(`Server started at http://localhost:${PORT}`);
-});
+app.use("/public", express.static(path.join(__dirname, "public")));
+app.use("/components", express.static(path.join(__dirname, "components")));
+app.use("/", express.static(path.join(__dirname, "pages")));

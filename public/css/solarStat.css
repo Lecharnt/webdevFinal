@@ -2,8 +2,8 @@
 .bar-container {
     width: 60px;
     height: 220px;
-    border: 2px solid #333;
-    background: #ddd;
+    border: 2px solid var(--color-primary);
+    background: var(--color-light); /* Light gray background */
     position: relative;
 }
 
@@ -31,11 +31,12 @@
     background: #555;
     opacity: 0.6;
 }
+
 .horizontal-container {
     width: 450px;
     height: 30px;
-    background: #ddd;
-    border: 2px solid #333;
+    background: var(--color-primary-light); /* Light gray background */
+    border: 2px solid var(--color-primary);
     border-radius: 5px;
     position: relative;
     overflow: hidden;
