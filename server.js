@@ -2,8 +2,9 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const path = require("path");
 const { MongoClient, ObjectId } = require("mongodb");
-
+const mongoose = require('mongoose');
 const app = express();
+const session = require('express-session');
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
@@ -16,7 +17,16 @@ const collectionName = "data";
 app.listen(3000, () => {
     console.log("Server started on port 3000");
 });
-
+// Session middleware - ADD THIS
+app.use(session({
+    secret: 'qewretrytuyiuoip', // Change this to a random string
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        secure: false, // Set to true if using HTTPS
+        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    }
+}));
 app.get("/get-all-data", async (req, res) => {
     const client = await MongoClient.connect(url);
     const db = client.db(dbName);
@@ -54,6 +64,9 @@ app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, "pages", "MainPage.html"));
 });
 app.get("/statistics", (req, res) => {
+    if (!req.session.loggedIn) {
+        return res.redirect('/login');
+    }
     res.sendFile(path.join(__dirname, "pages", "EnergyStatistics.html"));
 });
 app.get("/contact", (req, res) => {
@@ -73,6 +86,18 @@ app.get("/graph-energy-output", (req, res) => {
 });
 app.get("/graph-power-sources", (req, res) => {
     res.sendFile(path.join(__dirname, "pages", "GraphPowerSources.html"));
+});
+app.get("/login", (req, res) => {
+    if (req.session.loggedIn) {
+        return res.redirect('/');
+    }
+    res.sendFile(path.join(__dirname, "pages", "LogIn.html"));
+});
+app.get("/signup", (req, res) => {
+    res.sendFile(path.join(__dirname, "pages", "SignUp.html"));
+    if (req.session.loggedIn) {
+        return res.redirect('/');
+    }
 });
 
 app.get("/api/test-data", (req, res) => {
@@ -714,6 +739,120 @@ app.get("/api/power-stats", (req, res) => {
         energyCost: 1200,
         energyEarned: 1650
     });
+});
+const createUserCollection = async () => {
+    const client = await MongoClient.connect(url);
+    const db = client.db(dbName); // Use the SAME database "FinalProject"
+
+    // Create users collection if it doesn't exist
+    const collections = await db.listCollections().toArray();
+    const userCollectionExists = collections.some(col => col.name === 'users');
+
+    if (!userCollectionExists) {
+        await db.createCollection('users');
+        // Create index on username for uniqueness
+        await db.collection('users').createIndex({ username: 1 }, { unique: true });
+        console.log('Users collection created');
+    }
+
+    client.close();
+};
+
+// Call this when server starts
+createUserCollection().catch(console.error);
+// SIGNUP API
+app.post('/api/signup', async (req, res) => {
+    let client;
+    try {
+        console.log('Signup request:', req.body);
+        const { username, password } = req.body;
+
+        if (!username || !password) {
+            return res.json({ success: false, message: 'Username and password required' });
+        }
+
+        client = await MongoClient.connect(url);
+        const db = client.db(dbName);
+
+        // Check if user exists
+        const existing = await db.collection('users').findOne({ username });
+        if (existing) {
+            return res.json({ success: false, message: 'Username already exists' });
+        }
+
+        // Create user
+        const user = {
+            username,
+            password,
+            createdAt: new Date()
+        };
+
+        await db.collection('users').insertOne(user);
+        console.log('User saved:', username);
+
+        res.json({ success: true, message: 'Account created!' });
+    } catch (err) {
+        console.error('Signup error:', err);
+        res.json({ success: false, message: 'Server error: ' + err.message });
+    } finally {
+        if (client) client.close();
+    }
+});
+
+// LOGIN API
+app.post('/api/login', async (req, res) => {
+    let client;
+    try {
+        console.log('Login request:', req.body);
+        const { username, password } = req.body;
+
+        if (!username || !password) {
+            return res.json({ success: false, message: 'Username and password required' });
+        }
+
+        client = await MongoClient.connect(url);
+        const db = client.db(dbName);
+
+        // Find user
+        const user = await db.collection('users').findOne({ username, password });
+
+        if (user) {
+            // SET SESSION VARIABLE
+            req.session.loggedIn = true;
+            req.session.username = username;
+
+            res.json({
+                success: true,
+                message: 'Login successful!'
+            });
+        } else {
+            res.json({ success: false, message: 'Wrong username or password' });
+        }
+    } catch (err) {
+        console.error('Login error:', err);
+        res.json({ success: false, message: 'Server error: ' + err.message });
+    } finally {
+        if (client) client.close();
+    }
+});
+
+// LOGOUT API
+app.get('/api/logout', (req, res) => {
+    req.session.destroy((err) => {
+        if (err) {
+            return res.json({ success: false, message: 'Logout failed' });
+        }
+        res.json({ success: true, message: 'Logged out successfully' });
+    });
+});
+
+// CHECK LOGIN STATUS API
+app.get('/api/check-login', (req, res) => {
+    if (req.session.loggedIn) {
+        res.json({ loggedIn: true, username: req.session.username });
+    } else {
+        res.json({ loggedIn: false });
+    }
 });
 
 app.use("/public", express.static(path.join(__dirname, "public")));
