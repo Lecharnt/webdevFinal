@@ -1,0 +1,30 @@
+
+body {
+    color: var(--color-primary);
+}
+
+.contact-subtitle {
+    color: var(--color-gray);
+}
+
+.contact-title {
+    color: var(--color-primary);
+}
+
+.contact-details .address {
+    color: var(--color-primary);
+}
+
+.contact-details .email {
+    color: var(--color-primary);
+}
+
+.contact-button {
+    background-color: var(--color-primary);
+    color: var(--color-light);
+}
+
+.contact-button:hover {
+    background-color: var(--color-primary-light);
+    color: var(--color-light);
+}

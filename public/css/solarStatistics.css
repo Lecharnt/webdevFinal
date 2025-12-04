@@ -1,6 +1,18 @@
-html,
-body,
+html{
+    height: 100%;
+    width: 100%;
+    font-family: inherit;
+    color: var(--color-primary);
+}
+body{
+    height: 100%;
+    width: 100%;
+    font-family: inherit;
+    color: var(--color-primary);
+}
 #myChart {
     height: 100%;
     width: 100%;
+    font-family: inherit;
+    color: var(--color-primary);
 }
