@@ -78,11 +78,15 @@ function getChartParamsForDailyOutput() {
     const rangeBtn = cardBody.querySelector("[data-x-axis]");
     const yBtn = cardBody.querySelector("[data-y-axis]");
     const dateInput = document.getElementById("daily-output-date");
+    let dateVal = dateInput ? dateInput.value : getLocalDate();
+    if (rangeBtn && rangeBtn.dataset.value === "year") {
+        dateVal = dateVal.split("-")[0];
+    }
 
     return {
-        range: rangeBtn ? rangeBtn.dataset.value : 'day',
+        range: 'day',
         y: yBtn ? yBtn.dataset.value : 'solar',
-        date: dateInput ? dateInput.value : getLocalDate()
+        date: dateVal
     };
 }
 
@@ -90,18 +94,14 @@ function drawDailyOutputChart() {
     console.log("Drawing Daily Energy Output chart...");
     const params = getChartParamsForDailyOutput();
 
-    console.log("Chart params:", params);
-
     if (!params.date) {
-        console.log("Please select a date for Daily Energy Output");
+        console.warn("Please select a date for Daily Energy Output");
         return;
     }
 
     fetch(`/api/daily-output?range=${params.range}&date=${params.date}&y=${params.y}`)
         .then(res => res.json())
         .then(raw => {
-            console.log("Received data for Daily Energy Output:", raw);
-
             if (!raw || raw.length === 0) {
                 console.error("No data returned from API");
                 return;
@@ -112,15 +112,105 @@ function drawDailyOutputChart() {
                 ["Label", params.y.toUpperCase()],
                 ...rows
             ]);
+
             const chart = new google.visualization.AreaChart(
                 document.getElementById("DailyEnergyOutput")
             );
-            chart.draw(data, {
+
+            const options = {
                 height: 400,
                 title: `${params.y.toUpperCase()} Output (${params.range})`,
                 legend: "none",
-                hAxis: { slantedText: true, showTextEvery: 1 }
+                hAxis: {slantedText: true, showTextEvery: 1},
+                pointSize: 0,            // 👈 makes points visible/clickable
+                focusTarget: "datum"     // 👈 ensures clicks register on data points
+            };
+
+            chart.draw(data, options);
+
+            google.visualization.events.addListener(chart, "select", function() {
+                const selection = chart.getSelection();
+                if (selection.length > 0 && selection[0].row != null) {
+                    const rowIndex = selection[0].row;
+                    const label = data.getValue(rowIndex, 0);   // e.g. "14:00"
+                    const hour = parseInt(label);
+
+                    console.log("Clicked hour:", hour);
+
+                    fetch(`/api/daily-output-details?date=${params.date}&hour=${hour}&y=${params.y}`)
+                        .then(res => res.json())
+                        .then(items => {
+                            console.log("Raw records for hour:", items);
+
+                            const detailsDiv = document.getElementById("daily-output-details");
+                            if (detailsDiv) {
+                                // Clear previous content
+                                detailsDiv.innerHTML = "";
+
+                                // Table
+                                const table = document.createElement("table");
+                                table.className = "table table-striped table-bordered text-center";
+                                table.style.tableLayout = "fixed";   // 👈 force equal widths
+                                table.style.width = "100%";
+
+                                // Table head
+                                const thead = document.createElement("thead");
+                                const headRow = document.createElement("tr");
+
+                                const thTime = document.createElement("th");
+                                thTime.textContent = "Time";
+                                thTime.style.width = "50%";          // 👈 half width
+                                headRow.appendChild(thTime);
+
+                                const thPower = document.createElement("th");
+                                thPower.textContent = "Power Per Minute (Watts)";
+                                thPower.style.width = "50%";         // 👈 half width
+                                headRow.appendChild(thPower);
+
+                                thead.appendChild(headRow);
+                                table.appendChild(thead);
+
+                                // Table body
+                                const tbody = document.createElement("tbody");
+
+                                items.forEach(doc => {
+                                    const ts = new Date(doc.timestamp);
+
+                                    // Format time as HH:MM:SS AM/PM
+                                    let hours = ts.getHours();
+                                    const minutes = ts.getMinutes().toString().padStart(2, "0");
+                                    const seconds = ts.getSeconds().toString().padStart(2, "0");
+                                    const ampm = hours >= 12 ? "PM" : "AM";
+                                    hours = hours % 12;
+                                    if (hours === 0) hours = 12;
+                                    const formattedTime = `${hours}:${minutes}:${seconds} ${ampm}`;
+
+                                    const roundedValue = Math.round(doc.value * 10) / 10;
+
+                                    const row = document.createElement("tr");
+
+                                    const tdTime = document.createElement("td");
+                                    tdTime.textContent = formattedTime;
+                                    tdTime.style.width = "50%";
+                                    row.appendChild(tdTime);
+
+                                    const tdPower = document.createElement("td");
+                                    tdPower.textContent = roundedValue;
+                                    tdPower.style.width = "50%";
+                                    row.appendChild(tdPower);
+
+                                    tbody.appendChild(row);
+                                });
+
+                                table.appendChild(tbody);
+                                detailsDiv.appendChild(table);
+                            }
+                        })
+                        .catch(err => console.error("Error fetching details:", err));
+                }
             });
-        })
-        .catch(err => console.error("Daily Energy Output Chart Error:", err));
+
+
+
+        });
 }

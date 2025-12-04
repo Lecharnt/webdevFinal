@@ -70,22 +70,28 @@ const BatteryVoltage = {
         }
     },
 
-    getChartParamsForBatteryVoltage() {
-        const chartElement = document.getElementById("BatteryVoltage");
-        if (!chartElement) return { range: 'day', y: 'solar', date: this.getLocalDate() };
+        getChartParamsForBatteryVoltage() {
+            const chartElement = document.getElementById("BatteryVoltage");
+            if (!chartElement) return { range: 'day', y: 'BattV', date: this.getLocalDate() };
 
-        const cardBody = chartElement.closest('.card-body');
-        if (!cardBody) return { range: 'day', y: 'solar', date: this.getLocalDate() };
+            const cardBody = chartElement.closest('.card-body');
+            if (!cardBody) return { range: 'day', y: 'BattV', date: this.getLocalDate() };
 
-        const rangeBtn = cardBody.querySelector("[data-x-axis]");
-        const yBtn = cardBody.querySelector("[data-y-axis]");
-        const dateInput = document.getElementById("battery-voltage-date");
+            const rangeBtn = cardBody.querySelector("[data-x-axis]");
+            const dateInput = document.getElementById("battery-voltage-date");
 
-        return {
-            range: rangeBtn ? rangeBtn.dataset.value : 'day',
-            y: yBtn ? yBtn.dataset.value : 'solar',
-            date: dateInput ? dateInput.value : this.getLocalDate()
-        };
+            let range = rangeBtn ? rangeBtn.dataset.value : 'day';
+            let date = dateInput ? dateInput.value : this.getLocalDate();
+
+            if (range === "year" && date) {
+                date = date.split("-")[0];
+            }
+
+            return { range, y: "BattV", date };
+
+
+
+
     },
 
     drawBatteryVoltageChart() {
@@ -99,7 +105,7 @@ const BatteryVoltage = {
             return;
         }
 
-        fetch(`/api/daily-output-cool?range=${params.range}&date=${params.date}&y=${params.y}`)
+        fetch(`/api/daily-output-cool?range=${params.range}&date=${params.date}`)
             .then(res => res.json())
             .then(raw => {
                 console.log("Received data for Battery Voltage:", raw);
@@ -110,8 +116,9 @@ const BatteryVoltage = {
                 }
 
                 const rows = raw.map(item => [String(item[0]), Number(item[1])]);
+
                 const data = google.visualization.arrayToDataTable([
-                    ["Label", params.y.toUpperCase()],
+                    ["Label", params.y],
                     ...rows
                 ]);
 
@@ -121,7 +128,7 @@ const BatteryVoltage = {
 
                 chart.draw(data, {
                     height: 400,
-                    title: `${params.y.toUpperCase()} Battery Voltage (${params.range})`,
+                    title: `${params.y} (${params.range})`,
                     legend: "none",
                     hAxis: { slantedText: true, showTextEvery: 1 }
                 });
