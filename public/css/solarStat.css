@@ -1,16 +1,20 @@
+/* Shared bar styles */
 .bar-container {
     width: 60px;
     height: 220px;
-    border: 2px solid var(--color-primary);
-    background: var(--color-light);
+    border: 2px solid #333;
+    background: #ddd;
     position: relative;
 }
+
 .bar-fill {
     position: absolute;
     bottom: 0;
     width: 100%;
-    height: 0;
+    height: 0%;
 }
+
+/* Tick lines */
 .vertical-ticks {
     position: absolute;
     left: 0;
@@ -24,21 +28,22 @@
     position: absolute;
     width: 100%;
     height: 1px;
-    background: var(--color-primary-light);
+    background: #555;
     opacity: 0.6;
 }
 .horizontal-container {
     width: 450px;
     height: 30px;
-    background: var(--color-primary-light);
-    border: 2px solid var(--color-primary);
+    background: #ddd;
+    border: 2px solid #333;
     border-radius: 5px;
     position: relative;
     overflow: hidden;
 }
+
 .horizontal-fill {
     height: 100%;
-    width: 50%;
+    width: 50%; /* updated via JS */
 }
 
 .horizontal-ticks {
@@ -54,6 +59,6 @@
     position: absolute;
     width: 1px;
     height: 100%;
-    background: var(--color-primary-light);
+    background: #555;
     opacity: 0.6;
 }
