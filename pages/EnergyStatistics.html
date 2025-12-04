@@ -5,13 +5,9 @@
     <title>Title</title>
 </head>
 <body>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
 <script src="/public/js/include.js"></script>
-<script src="https://www.gstatic.com/charts/loader.js"></script>
-<script src="/public/js/graph.js"></script>
-<script src="/public/js/graphCool.js"></script>
-<script src="/public/js/areaChart.js"></script>
-<link rel="stylesheet" href="/public/css/colors.css" />
+<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+<script type="text/javascript" src="/public/js/graph.js"></script>
 <div id="navbar"></div>
 
 <br>
@@ -60,17 +56,16 @@
                 </p>
                 <div class="d-flex gap-2 mt-4">
                     <div>
-                        <input type="date" id="daily-output-date" class="form-control" />
+                        <label class="form-label">Select Date</label>
+                        <input type="date" id="daily-outputs" class="form-control" />
                     </div>
                     <div class="dropdown">
                         <button class="btn btn-secondary dropdown-toggle"
                                 data-x-axis
-                                data-chart="daily-outputs"
+                                data-chart="daily-output"
                                 data-value="day"
                                 type="button"
-                                id ="poolDay"
                                 data-bs-toggle="dropdown">
-
                             Day
                         </button>
 
@@ -82,7 +77,7 @@
                     </div>
 
                     <div class="dropdown">
-                        <button class="btn btn-secondary dropdown-toggle" id = "poolPow" type="button" data-bs-toggle="dropdown" aria-expanded="false" data-y-axis data-chart="daily-output" data-value="solar">
+                        <button class="btn btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" data-y-axis data-chart="daily-output" data-value="solar">
                             Solar
                         </button>
                         <ul class="dropdown-menu">
@@ -105,7 +100,7 @@
 
             <!-- Graph Placeholder -->
             <div class="col-md-7 d-flex align-items-center justify-content-center bg-white p-4">
-                <div style="width:100%; max-width:700px;" id="BatteryVoltage"></div>
+                <div style="width:100%; max-width:700px;" id="BatteryVoltage">Graph Here</div>
             </div>
 
             <!-- Text -->
@@ -116,24 +111,25 @@
                     for the Y-axis and choose the Year or Month for the X-axis.
                 </p>
                 <div class="d-flex gap-2 mt-4">
-                    <div>
-                        <input type="date" id="battery-voltage-date" class="form-control" />
-                    </div>
                     <div class="dropdown">
-                        <button class="btn btn-secondary dropdown-toggle"
-                                data-x-axis
-                                data-chart="daily-outputs-cool"
-                                data-value="day"
-                                type="button"
-                                id ="coolDay"
-                                data-bs-toggle="dropdown">
-                            Day
+                        <button class="btn btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            Select For X-axis
                         </button>
-
                         <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" data-value="day">Day</a></li>
-                            <li><a class="dropdown-item" data-value="month">Month</a></li>
-                            <li><a class="dropdown-item" data-value="year">Year</a></li>
+                            <li><a class="dropdown-item" href="#">Action</a></li>
+                            <li><a class="dropdown-item" href="#">Another action</a></li>
+                            <li><a class="dropdown-item" href="#">Something else here</a></li>
+                        </ul>
+                    </div>
+
+                    <div class="dropdown">
+                        <button class="btn btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            Select For Y-axis
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#">Action</a></li>
+                            <li><a class="dropdown-item" href="#">Another action</a></li>
+                            <li><a class="dropdown-item" href="#">Something else here</a></li>
                         </ul>
                     </div>
                 </div>
@@ -165,17 +161,18 @@
                 <div class="d-flex gap-4 mt-4">
 
                     <div>
-                        <input type="date" id="power-sources-date" class="form-control" />
+                        <label class="form-label">Select Date</label>
+                        <input type="date" id="datePicker" class="form-control" />
                     </div>
 
                     <div>
+                        <label class="form-label">Filter Type</label>
                         <div class="dropdown">
                             <button class="btn btn-secondary dropdown-toggle"
                                     data-x-axis
                                     data-range="day"
                                     type="button"
-                                    data-bs-toggle="dropdown"
-                                    data-chart="power-sources">
+                                    data-bs-toggle="dropdown">
                                 Day
                             </button>
 
@@ -186,9 +183,6 @@
                             </ul>
                         </div>
                     </div>
-                </div>
-                <div class=" gap-2 mt-4" style="margin-left: auto;">
-                    <a href="/graph-power-sources" class="nav-link me-2">Explore Graph Further &#8594</a>
                 </div>
             </div>
         </div>
@@ -204,6 +198,8 @@
     </div>
 </div>
 <div id="footer"></div>
+<script src="/public/js/areaChart.js"></script>
+<script src="https://www.gstatic.com/charts/loader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js"></script>
 </body>
