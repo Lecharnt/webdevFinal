@@ -35,7 +35,7 @@
 body {
     opacity: 1;
     animation-name: fadeInOpacity;
-    animation-duration: .5s; /* How long the animation takes */
-    animation-iteration-count: 1; /* Runs once */
+    animation-duration: .5s;
+    animation-iteration-count: 1;
     animation-timing-function: ease-in;
 }

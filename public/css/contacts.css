@@ -1,98 +1,30 @@
 
 body {
-    font-family: inherit; /* Inherits from :root */
     color: var(--color-primary);
-    line-height: 1.5;
-}
-
-.contact-section {
-    min-height: 80vh;
-    padding: 4rem 0;
 }
 
 .contact-subtitle {
-    font-size: 4rem;
-    font-weight: 300;
     color: var(--color-gray);
-    line-height: 0.9;
 }
 
 .contact-title {
-    font-size: 4rem;
-    font-weight: 700;
     color: var(--color-primary);
-    line-height: 0.9;
 }
 
 .contact-details .address {
-    font-size: 1.125rem;
-    line-height: 1.6;
-    max-width: 300px;
     color: var(--color-primary);
 }
 
 .contact-details .email {
-    font-size: 1rem;
-    font-weight: 300;
     color: var(--color-primary);
 }
 
 .contact-button {
     background-color: var(--color-primary);
     color: var(--color-light);
-    padding: 1.25rem 2.5rem;
-    font-size: 0.75rem;
-    font-weight: 400;
-    letter-spacing: 0.5px;
-    text-decoration: none;
-    border: none;
-    transition: background-color 0.3s;
 }
 
 .contact-button:hover {
     background-color: var(--color-primary-light);
     color: var(--color-light);
-}
-
-/* Responsive adjustments */
-@media (max-width: 992px) {
-    .contact-subtitle,
-    .contact-title {
-        font-size: 3.5rem;
-    }
-
-    .contact-header {
-        margin-bottom: 3rem !important;
-    }
-}
-
-@media (max-width: 768px) {
-    .contact-subtitle,
-    .contact-title {
-        font-size: 3rem;
-    }
-
-    .contact-section {
-        padding: 2rem 0;
-    }
-
-    .image-placeholder {
-        height: 400px;
-        margin-top: 2rem;
-    }
-}
-
-@media (max-width: 576px) {
-    .contact-subtitle,
-    .contact-title {
-        font-size: 2.5rem;
-    }
-
-    .contact-details .address {
-        font-size: 1rem;
-    }
-
-    .image-placeholder {
-        height: 300px;
-    }
 }
