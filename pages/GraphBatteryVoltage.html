@@ -35,7 +35,6 @@
 
             <!-- Graph Placeholder -->
             <div class="col-md-7 d-flex align-items-center justify-content-center bg-white p-4">
-                <div style="width:100%; max-width:700px;" id="BatteryVoltage">Graph Here</div>
             </div>
 
             <!-- Text -->
@@ -49,36 +48,10 @@
                     <div>
                         <input type="date" id="battery-voltage-date" class="form-control" />
                     </div>
-                    <div class="dropdown">
-                        <button class="btn btn-secondary dropdown-toggle"
-                                data-x-axis
-                                data-chart="daily-outputs-cool"
-                                data-value="day"
-                                type="button"
-                                id ="coolDay"
-                                data-bs-toggle="dropdown">
-                            Day
-                        </button>
-
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" data-value="day">Day</a></li>
-                            <li><a class="dropdown-item" data-value="month">Month</a></li>
-                            <li><a class="dropdown-item" data-value="year">Year</a></li>
-                        </ul>
-                    </div>
-
-                    <div class="dropdown">
-                        <button class="btn btn-secondary dropdown-toggle" id="coolPow" type="button" data-bs-toggle="dropdown" aria-expanded="false" data-y-axis data-chart="daily-outputs-cool" data-value="solar">
-                            Solar
-                        </button>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" data-value="solar" href="#">Solar</a></li>
-                            <li><a class="dropdown-item" data-value="wind" href="#">Wind</a></li>
-                        </ul>
-                    </div>
                 </div>
             </div>
-            <h2>Data from selected day:</h2>
+            <h2 class="text-center">Data from selected day:</h2>
+            <div id="battery-voltage-details"></div>
         </div>
     </div>
 </div>
