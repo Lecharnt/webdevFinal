@@ -79,16 +79,24 @@ function getChartParamsForDailyOutput() {
     const yBtn = cardBody.querySelector("[data-y-axis]");
     const dateInput = document.getElementById("daily-output-date");
     let dateVal = dateInput ? dateInput.value : getLocalDate();
-    if (rangeBtn && rangeBtn.dataset.value === "year") {
-        dateVal = dateVal.split("-")[0];
+
+    if (rangeBtn) {
+        if (rangeBtn.dataset.value === "year") {
+            // Only keep YYYY
+            dateVal = dateVal.split("-")[0];
+        } else if (rangeBtn.dataset.value === "month") {
+            // Keep YYYY-MM
+            dateVal = dateVal.slice(0, 7);
+        }
     }
 
     return {
-        range: 'day',
+        range: rangeBtn ? rangeBtn.dataset.value : 'day',
         y: yBtn ? yBtn.dataset.value : 'solar',
         date: dateVal
     };
 }
+
 
 function drawDailyOutputChart() {
     console.log("Drawing Daily Energy Output chart...");

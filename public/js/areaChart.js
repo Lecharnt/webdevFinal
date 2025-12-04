@@ -1,12 +1,10 @@
+google.charts.load("current", { packages: ["corechart"] });
 google.charts.setOnLoadCallback(initPowerSources);
 
 function initPowerSources() {
     console.log("Initializing Power Sources chart...");
     setupPowerSourcesControls();
-    const dateInput = document.getElementById("power-sources-date");
-    if (dateInput) {
-        dateInput.value = getLocalDateForPowerSources();
-    }
+    document.getElementById("power-sources-date").value = getLocalDateForPowerSources();
     loadPowerSourcesChart();
 }
 
@@ -17,108 +15,70 @@ function getLocalDateForPowerSources() {
 }
 
 function setupPowerSourcesControls() {
-    console.log("Setting up controls for Power Sources...");
     const chartElement = document.getElementById("PowerSourcesChart");
-    if (!chartElement) {
-        console.error("PowerSourcesChart chart element not found!");
-        return;
-    }
-
-    const cardBody = chartElement.closest('.card-body');
-    if (!cardBody) {
-        console.error("Could not find card body for Power Sources");
-        return;
-    }
-
-    // Get dropdown elements specific to Power Sources section
-    const dropdown = cardBody.querySelector("[data-x-axis]");
     const dateInput = document.getElementById("power-sources-date");
 
-    if (!dropdown) {
-        console.error("Power Sources dropdown not found!");
-        return;
+    if (!chartElement) return;
+
+    const noDropdown = chartElement.dataset.noDropdown === "true";
+
+    if (!noDropdown) {
+        // Only setup dropdown listeners if dropdown exists
+        const cardBody = chartElement.closest('.card-body');
+        const dropdown = cardBody.querySelector("[data-x-axis]");
+        if (dropdown) {
+            cardBody.querySelectorAll(".dropdown-menu .dropdown-item").forEach(item => {
+                item.addEventListener("click", (e) => {
+                    e.preventDefault();
+                    dropdown.textContent = e.target.textContent;
+                    dropdown.dataset.range = e.target.dataset.value;
+                    loadPowerSourcesChart();
+                });
+            });
+        }
     }
 
-    if (!dateInput) {
-        console.error("power-sources-date input not found!");
-        return;
+    // Always setup date input listener
+    if (dateInput) {
+        dateInput.addEventListener("change", loadPowerSourcesChart);
     }
-
-    // Handle dropdown selections for Power Sources
-    cardBody.querySelectorAll(".dropdown-menu .dropdown-item").forEach(item => {
-        item.addEventListener("click", (e) => {
-            e.preventDefault();
-            const range = e.target.dataset.value;
-
-            console.log("Power Sources range changed to:", range);
-
-            // Update button text and internal dataset
-            dropdown.textContent = e.target.textContent;
-            dropdown.dataset.range = range;
-
-            loadPowerSourcesChart();
-        });
-    });
-
-    // Reload when date changes
-    dateInput.addEventListener("change", loadPowerSourcesChart);
 }
+
 
 function getChartParamsForPowerSources() {
     const chartElement = document.getElementById("PowerSourcesChart");
-    if (!chartElement) return { range: 'day', date: getLocalDateForPowerSources() };
-
-    const cardBody = chartElement.closest('.card-body');
-    if (!cardBody) return { range: 'day', date: getLocalDateForPowerSources() };
-
-    const dropdown = cardBody.querySelector("[data-x-axis]");
     const dateInput = document.getElementById("power-sources-date");
 
+    const noDropdown = chartElement.dataset.noDropdown === "true";
+
     return {
-        range: dropdown ? dropdown.dataset.range : 'day',
+        range: noDropdown ? "day" : (chartElement.closest('.card-body').querySelector("[data-x-axis]")?.dataset.range || "day"),
         date: dateInput ? dateInput.value : getLocalDateForPowerSources()
     };
 }
 
+
 function loadPowerSourcesChart() {
-    console.log("Loading Power Sources chart...");
     const params = getChartParamsForPowerSources();
-
-    console.log("Power Sources params:", params);
-
-    if (!params.range || !params.date) {
-        console.log("Please select both range and date for Power Sources");
-        return;
-    }
 
     fetch(`/api/power-sources?range=${params.range}&date=${params.date}`)
         .then(res => res.json())
         .then(raw => {
-            console.log("Received data for Power Sources:", raw);
-
-            if (raw.error) {
-                //console.error("API error for Power Sources:", raw.error);
-                return alert(raw.error);
-            }
-
-            if (!raw || !raw.labels || !raw.grid || !raw.solar || !raw.battery) {
+            if (!raw || !raw.labels) {
                 console.error("Invalid data structure for Power Sources");
                 return;
             }
-
-            drawPowerSourcesChart(raw, params.range);
+            drawPowerSourcesChart(raw, params.range, params.date);
         })
         .catch(err => console.error("Power Sources Chart load error:", err));
 }
 
-function drawPowerSourcesChart(raw, range) {
-    console.log("Drawing Power Sources chart...");
-
+function drawPowerSourcesChart(raw, range, date) {
     const data = google.visualization.arrayToDataTable([
-        ["Time", "Grid", "Solar", "Battery"],
+        ["Time", "Wind", "Solar", "Battery"],
         ...raw.labels.map((label, i) => [
             String(label),
-            raw.grid[i] || 0,
+            raw.acPower[i] || 0,
             raw.solar[i] || 0,
             raw.battery[i] || 0
         ])
@@ -127,15 +87,81 @@ function drawPowerSourcesChart(raw, range) {
     const options = {
         title: chartTitleForPowerSources(range),
         height: 450,
-        vAxis: { minValue: 0, maxValue: 2000 },
         legend: { position: "bottom" },
-        colors: ["#0066ff", "#ffcc00", "#ff0000"],
-        areaOpacity: 0.35
+        vAxis: { minValue: 0 },
+        pointSize: 0,
+        focusTarget: "datum",
+        areaOpacity: 0.35,
+        colors: ["#0066ff", "#ffcc00", "#ff0000"]
     };
 
-    new google.visualization.AreaChart(
+    const chart = new google.visualization.AreaChart(
         document.getElementById("PowerSourcesChart")
-    ).draw(data, options);
+    );
+
+    chart.draw(data, options);
+
+    google.visualization.events.addListener(chart, "select", function() {
+        const selection = chart.getSelection();
+        if (selection.length === 0 || selection[0].row == null) return;
+
+        const rowIndex = selection[0].row;
+        const colIndex = selection[0].column;
+
+
+        const sources = ["wind", "solar", "battery"];
+        const source = sources[colIndex - 1];
+
+        const label = data.getValue(rowIndex, 0);
+        let hour = parseInt(label);
+
+        console.log("Clicked:", { label, hour, source });
+
+        fetch(`/api/power-sources-details?date=${date}&hour=${hour}&source=${source}`)
+            .then(res => res.json())
+            .then(items => showPowerSourcesDetails(items, source))
+            .catch(err => console.error("Details fetch error:", err));
+    });
+}
+
+function showPowerSourcesDetails(items, source) {
+    const detailsDiv = document.getElementById("power-sources-details");
+    detailsDiv.innerHTML = "";
+
+    const table = document.createElement("table");
+    table.className = "table table-striped table-bordered text-center";
+    table.style.width = "100%";
+
+    const thead = document.createElement("thead");
+    thead.innerHTML = `
+        <tr>
+            <th style="width:50%">Time</th>
+            <th style="width:50%">${source.charAt(0).toUpperCase() + source.slice(1)} Per Minute (Watts)</th>
+        </tr>`;
+    table.appendChild(thead);
+
+    const tbody = document.createElement("tbody");
+
+    items.forEach(doc => {
+        const ts = new Date(doc.timestamp);
+        let hours = ts.getHours();
+        const minutes = ts.getMinutes().toString().padStart(2, "0");
+        const seconds = ts.getSeconds().toString().padStart(2, "0");
+        const ampm = hours >= 12 ? "PM" : "AM";
+        hours = hours % 12 || 12;
+
+        const formattedTime = `${hours}:${minutes}:${seconds} ${ampm}`;
+        const roundedValue = Math.round(doc.value * 10) / 10;
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td>${formattedTime}</td>
+            <td>${roundedValue}</td>`;
+        tbody.appendChild(tr);
+    });
+
+    table.appendChild(tbody);
+    detailsDiv.appendChild(table);
 }
 
 function chartTitleForPowerSources(range) {

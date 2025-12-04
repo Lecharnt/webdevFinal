@@ -35,7 +35,7 @@
 
             <!-- Graph Placeholder -->
             <div class="col-md-7 d-flex align-items-center justify-content-center bg-white p-4 ">
-                <div style="width:100%; max-width:700px;" id="PowerSourcesChart"></div>
+                <div style="width:100%; max-width:700px;" id="PowerSourcesChart" data-no-dropdown="true"></div>
             </div>
 
             <!-- Text -->
@@ -51,28 +51,10 @@
                     <div>
                         <input type="date" id="power-sources-date" class="form-control" />
                     </div>
-
-                    <div>
-                        <div class="dropdown">
-                            <button class="btn btn-secondary dropdown-toggle"
-                                    data-x-axis
-                                    data-range="day"
-                                    type="button"
-                                    data-bs-toggle="dropdown"
-                                    data-chart="power-sources">
-                                Day
-                            </button>
-
-                            <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" data-value="day">Day</a></li>
-                                <li><a class="dropdown-item" data-value="month">Month</a></li>
-                                <li><a class="dropdown-item" data-value="year">Year</a></li>
-                            </ul>
-                        </div>
-                    </div>
                 </div>
             </div>
-            <h2>Data from selected day:</h2>
+            <h2 class="text-center">Data from selected day:</h2>
+            <div id="power-sources-details"></div>
         </div>
     </div>
 </div>

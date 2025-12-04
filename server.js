@@ -122,8 +122,11 @@ app.get("/api/daily-output", async function (req, res) {
                 if (y === "solar") {
                     val = parseFloat(doc.PVpow || 0);
                 } else if (y === "wind") {
-                    val = parseFloat(doc.acPower || 0);
+                    var ac = parseFloat(doc.acPower || 0);
+                    var pv = parseFloat(doc.PVpow || 0);
+                    val = Math.max(ac - pv, 0);   // 👈 clamp negatives
                 }
+                if (isNaN(val)) val = 0;
                 sums[hour] = sums[hour] + val;
                 counts[hour] = counts[hour] + 1;
             });
@@ -171,8 +174,11 @@ app.get("/api/daily-output", async function (req, res) {
                 if (y === "solar") {
                     val = parseFloat(doc.PVpow || 0);
                 } else if (y === "wind") {
-                    val = parseFloat(doc.acPower || 0);
+                    var ac = parseFloat(doc.acPower || 0);
+                    var pv = parseFloat(doc.PVpow || 0);
+                    val = Math.max(ac - pv, 0);   // 👈 clamp negatives
                 }
+                if (isNaN(val)) val = 0;
                 sums[day - 1] = sums[day - 1] + val;
                 counts[day - 1] = counts[day - 1] + 1;
             });
@@ -216,14 +222,14 @@ app.get("/api/daily-output", async function (req, res) {
                 if (y === "solar") {
                     val = parseFloat(doc.PVpow);
                 } else if (y === "wind") {
-                    val = parseFloat(doc.acPower);
+                    var ac = parseFloat(doc.acPower || 0);
+                    var pv = parseFloat(doc.PVpow || 0);
+                    val = Math.max(ac - pv, 0);   // 👈 clamp negatives
                 }
-                console.log("Month:", month, "Raw:", doc.acPower, "Parsed:", val);
                 if (isNaN(val)) val = 0;
                 sums[month] += val;
                 counts[month] += 1;
             });
-
 
             var averages = [];
             for (var i = 0; i < 12; i++) {
@@ -437,6 +443,43 @@ app.get("/api/daily-output-cool", async function (req, res) {
 });
 
 
+app.get("/api/battery-voltage-details", async (req, res) => {
+    const { date, hour } = req.query;
+    if (!date || hour == null) {
+        return res.status(400).json({ error: "Missing date or hour" });
+    }
+
+    const client = await MongoClient.connect(url);
+    const db = client.db(dbName);
+
+    try {
+        const parts = date.split("-");
+        const year = Number(parts[0]);
+        const month = Number(parts[1]) - 1;
+        const day = Number(parts[2]);
+
+        const start = new Date(year, month, day, Number(hour), 0, 0);
+        const end   = new Date(year, month, day, Number(hour), 59, 59);
+
+        const items = await db.collection(collectionName).find({
+            rowTimestamp: { $gte: start, $lte: end }
+        }).toArray();
+
+        // sanitize values
+        const results = items.map(doc => {
+            let val = parseFloat(doc.BattV || 0);
+            if (isNaN(val)) val = 0;
+            return { timestamp: doc.rowTimestamp, value: val };
+        });
+
+        res.json(results);
+    } finally {
+        client.close();
+    }
+});
+
+
+
 app.get("/api/performance-data", (req, res) => {
     const testData = [
         { label: "REBus", current: 60 },
@@ -469,189 +512,180 @@ app.get("/api/power-sources", async function (req, res) {
 
     try {
         if (range === "day") {
-            var parts = date.split("-");
-            var year = Number(parts[0]);
-            var month = Number(parts[1]) - 1;
-            var day = Number(parts[2]);
+            const parts = date.split("-");
+            const year = Number(parts[0]);
+            const month = Number(parts[1]) - 1;
+            const day = Number(parts[2]);
 
-            var start = new Date(year, month, day, 0, 0, 0);
-            var end   = new Date(year, month, day, 23, 59, 59);
+            const start = new Date(year, month, day, 0, 0, 0);
+            const end   = new Date(year, month, day, 23, 59, 59);
 
             const items = await db.collection(collectionName).find({
                 rowTimestamp: { $gte: start, $lte: end }
             }).toArray();
 
-            var labels = [];
-            var grid = [];
-            var solar = [];
-            var battery = [];
-            var sumsGrid = [];
-            var sumsSolar = [];
-            var sumsBatt = [];
-            var counts = [];
+            const labels = [];
+            const acPower = [], solar = [], battery = [];
+            const sumsAc = [], sumsSolar = [], sumsBatt = [], counts = [];
 
-            for (var i = 0; i < 24; i++) {
+            for (let i = 0; i < 24; i++) {
                 labels.push(i + ":00");
-                sumsGrid.push(0);
+                sumsAc.push(0);
                 sumsSolar.push(0);
                 sumsBatt.push(0);
                 counts.push(0);
             }
 
-            for (var j = 0; j < items.length; j++) {
-                var doc = items[j];
-                var hour = new Date(doc.rowTimestamp).getHours();
+            for (let j = 0; j < items.length; j++) {
+                const doc = items[j];
+                const hour = new Date(doc.rowTimestamp).getHours();
 
-                var g = parseFloat(doc.GridPow || 0);
-                var s = parseFloat(doc.PVpow || 0);
-                var b = parseFloat(doc.BattPow || 0);
+                let ac = parseFloat(doc.acPower || 0);
+                let pv = parseFloat(doc.PVpow || 0);
+                let g = Math.max(ac - pv, 0);
+                let s = parseFloat(doc.PVpow || 0);
+                let b = parseFloat(doc.BattPow || 0);
 
                 if (isNaN(g)) g = 0;
                 if (isNaN(s)) s = 0;
                 if (isNaN(b)) b = 0;
 
-                sumsGrid[hour] += g;
+                sumsAc[hour] += g;
                 sumsSolar[hour] += s;
                 sumsBatt[hour] += b;
                 counts[hour] += 1;
             }
 
-            for (var i = 0; i < 24; i++) {
+            for (let i = 0; i < 24; i++) {
                 if (counts[i] > 0) {
-                    grid.push(sumsGrid[i] / counts[i]);
+                    acPower.push(sumsAc[i] / counts[i]);
                     solar.push(sumsSolar[i] / counts[i]);
                     battery.push(sumsBatt[i] / counts[i]);
                 } else {
-                    grid.push(0);
+                    acPower.push(0);
                     solar.push(0);
                     battery.push(0);
                 }
             }
 
-            return res.json({ labels, grid, solar, battery });
+            return res.json({ labels, acPower, solar, battery });
         }
 
         if (range === "month") {
-            var parts = date.split("-");
-            var year = Number(parts[0]);
-            var month = Number(parts[1]);
+            const parts = date.split("-");
+            const year = Number(parts[0]);
+            const month = Number(parts[1]);
 
-            var start = new Date(year, month - 1, 1, 0, 0, 0);
-            var end   = new Date(year, month, 0, 23, 59, 59);
+            const start = new Date(year, month - 1, 1, 0, 0, 0);
+            const end   = new Date(year, month, 0, 23, 59, 59);
 
             const items = await db.collection(collectionName).find({
                 rowTimestamp: { $gte: start, $lte: end }
             }).toArray();
 
-            var daysInMonth = new Date(year, month, 0).getDate();
-            var labels = [];
-            var grid = [];
-            var solar = [];
-            var battery = [];
-            var sumsGrid = [];
-            var sumsSolar = [];
-            var sumsBatt = [];
-            var counts = [];
+            const daysInMonth = new Date(year, month, 0).getDate();
+            const labels = [];
+            const acPower = [], solar = [], battery = [];
+            const sumsAc = [], sumsSolar = [], sumsBatt = [], counts = [];
 
-            for (var i = 1; i <= daysInMonth; i++) {
+            for (let i = 1; i <= daysInMonth; i++) {
                 labels.push(i);
-                sumsGrid.push(0);
+                sumsAc.push(0);
                 sumsSolar.push(0);
                 sumsBatt.push(0);
                 counts.push(0);
             }
 
-            for (var j = 0; j < items.length; j++) {
-                var doc = items[j];
-                var day = new Date(doc.rowTimestamp).getDate();
+            for (let j = 0; j < items.length; j++) {
+                const doc = items[j];
+                const day = new Date(doc.rowTimestamp).getDate();
 
-                var g = parseFloat(doc.GridPow || 0);
-                var s = parseFloat(doc.PVpow || 0);
-                var b = parseFloat(doc.BattPow || 0);
+                let ac = parseFloat(doc.acPower || 0);
+                let pv = parseFloat(doc.PVpow || 0);
+                let g = Math.max(ac - pv, 0);
+                let s = parseFloat(doc.PVpow || 0);
+                let b = parseFloat(doc.BattPow || 0);
 
                 if (isNaN(g)) g = 0;
                 if (isNaN(s)) s = 0;
                 if (isNaN(b)) b = 0;
 
-                sumsGrid[day - 1] += g;
+                sumsAc[day - 1] += g;
                 sumsSolar[day - 1] += s;
                 sumsBatt[day - 1] += b;
                 counts[day - 1] += 1;
             }
 
-            for (var i = 0; i < daysInMonth; i++) {
+            for (let i = 0; i < daysInMonth; i++) {
                 if (counts[i] > 0) {
-                    grid.push(sumsGrid[i] / counts[i]);
+                    acPower.push(sumsAc[i] / counts[i]);
                     solar.push(sumsSolar[i] / counts[i]);
                     battery.push(sumsBatt[i] / counts[i]);
                 } else {
-                    grid.push(0);
+                    acPower.push(0);
                     solar.push(0);
                     battery.push(0);
                 }
             }
 
-            return res.json({ labels, grid, solar, battery });
+            return res.json({ labels, acPower, solar, battery });
         }
 
         if (range === "year") {
-            var yearStr = date.split("-")[0]; // handles YYYY or YYYY-MM-DD
-            var year = Number(yearStr);
+            const yearStr = date.split("-")[0];
+            const year = Number(yearStr);
 
-            var start = new Date(year, 0, 1, 0, 0, 0);
-            var end   = new Date(year, 11, 31, 23, 59, 59);
+            const start = new Date(year, 0, 1, 0, 0, 0);
+            const end   = new Date(year, 11, 31, 23, 59, 59);
 
             const items = await db.collection(collectionName).find({
                 rowTimestamp: { $gte: start, $lte: end }
             }).toArray();
 
-            var labels = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-            var grid = [];
-            var solar = [];
-            var battery = [];
-            var sumsGrid = [];
-            var sumsSolar = [];
-            var sumsBatt = [];
-            var counts = [];
+            const labels = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+            const acPower = [], solar = [], battery = [];
+            const sumsAc = [], sumsSolar = [], sumsBatt = [], counts = [];
 
-            for (var i = 0; i < 12; i++) {
-                sumsGrid.push(0);
+            for (let i = 0; i < 12; i++) {
+                sumsAc.push(0);
                 sumsSolar.push(0);
                 sumsBatt.push(0);
                 counts.push(0);
             }
 
-            for (var j = 0; j < items.length; j++) {
-                var doc = items[j];
-                var month = new Date(doc.rowTimestamp).getMonth();
+            for (let j = 0; j < items.length; j++) {
+                const doc = items[j];
+                const month = new Date(doc.rowTimestamp).getMonth();
 
-                var g = parseFloat(doc.GridPow || 0);
-                var s = parseFloat(doc.PVpow || 0);
-                var b = parseFloat(doc.BattPow || 0);
+                let ac = parseFloat(doc.acPower || 0);
+                let pv = parseFloat(doc.PVpow || 0);
+                let g = Math.max(ac - pv, 0);
+                let s = parseFloat(doc.PVpow || 0);
+                let b = parseFloat(doc.BattPow || 0);
 
                 if (isNaN(g)) g = 0;
                 if (isNaN(s)) s = 0;
                 if (isNaN(b)) b = 0;
 
-                sumsGrid[month] += g;
+                sumsAc[month] += g;
                 sumsSolar[month] += s;
                 sumsBatt[month] += b;
                 counts[month] += 1;
             }
 
-            for (var i = 0; i < 12; i++) {
+            for (let i = 0; i < 12; i++) {
                 if (counts[i] > 0) {
-                    grid.push(sumsGrid[i] / counts[i]);
+                    acPower.push(sumsAc[i] / counts[i]);
                     solar.push(sumsSolar[i] / counts[i]);
                     battery.push(sumsBatt[i] / counts[i]);
                 } else {
-                    grid.push(0);
+                    acPower.push(0);
                     solar.push(0);
                     battery.push(0);
                 }
             }
 
-            return res.json({ labels, grid, solar, battery });
+            return res.json({ labels, acPower, solar, battery });
         }
 
         res.status(400).json({ error: "Invalid range" });
@@ -659,6 +693,58 @@ app.get("/api/power-sources", async function (req, res) {
         client.close();
     }
 });
+
+app.get("/api/power-sources-details", async (req, res) => {
+    const { date, hour, source } = req.query;
+    if (!date || hour == null || !source) {
+        return res.status(400).json({ error: "Missing date, hour or source" });
+    }
+
+    const client = await MongoClient.connect(url);
+    const db = client.db(dbName);
+
+    try {
+        const parts = date.split("-");
+        const year = Number(parts[0]);
+        const month = Number(parts[1]) - 1;
+        const day = Number(parts[2]);
+
+        const start = new Date(year, month, day, Number(hour), 0, 0);
+        const end   = new Date(year, month, day, Number(hour), 59, 59);
+
+        const items = await db.collection(collectionName).find({
+            rowTimestamp: { $gte: start, $lte: end }
+        }).toArray();
+
+        const results = items.map(doc => {
+            let val = 0;
+
+            if (source === "solar") {
+                val = parseFloat(doc.PVpow);
+                if (isNaN(val)) { val = 0; }
+            } else if (source === "wind") {
+                let ac = parseFloat(doc.acPower);
+                if (isNaN(ac)) { ac = 0; }
+                let pv = parseFloat(doc.PVpow);
+                if (isNaN(pv)) { pv = 0; }
+                val = Math.max(ac - pv, 0);
+            } else if (source === "battery") {
+                val = parseFloat(doc.BattPow);
+                if (isNaN(val)) { val = 0; }
+            }
+
+            return { timestamp: doc.rowTimestamp, value: val };
+        });
+
+        res.json(results);
+    } finally {
+        client.close();
+    }
+});
+
+
+
+
 
 app.get("/api/daily-output-details", async (req, res) => {
     const { date, hour, y } = req.query;
@@ -682,15 +768,14 @@ app.get("/api/daily-output-details", async (req, res) => {
             rowTimestamp: { $gte: start, $lte: end }
         }).toArray();
 
-        // sanitize values
         const results = items.map(doc => {
             let val = 0;
             if (y === "solar") {
                 val = parseFloat(doc.PVpow || 0);
             } else if (y === "wind") {
-                val = parseFloat(doc.acPower || 0);
-            } else if (y === "battery") {
-                val = parseFloat(doc.BattPow || 0);
+                const ac = parseFloat(doc.acPower || 0);
+                const pv = parseFloat(doc.PVpow || 0);
+                val = Math.max(ac - pv, 0);   // 👈 apply same formula
             }
             if (isNaN(val)) val = 0;
             return { timestamp: doc.rowTimestamp, value: val };
